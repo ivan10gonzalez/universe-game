@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#000000" />
+  <title>Universe Game</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <button class="hamburger" id="menuBtn" aria-label="Abrir menú"><i></i><i></i><i></i></button>
+    <button class="login-btn" id="loginBtn" aria-label="Iniciar sesión"><span class="login-icon" aria-hidden="true"><svg viewBox="0 0 40 40"><path d="M16 5h14a3 3 0 0 1 3 3v24a3 3 0 0 1-3 3H16"/><path d="M22 20H5M5 20l7-7M5 20l7 7"/></svg></span> <span>Iniciar sesión</span></button>
+  </header>
+
+  <aside class="drawer" id="drawer" aria-hidden="true">
+    <div class="drawer-top"><div class="drawer-brand">UNIVERSE<br><strong>game</strong></div><button id="closeBtn">×</button></div>
+    <nav>
+      <a href="#home" data-route="home">Inicio</a>
+      <a href="#casino" data-route="casino">Casino</a>
+      <a href="#sports" data-route="sports">Apuestas deportivas</a>
+      <a href="#games" data-route="games">Juegos</a>
+    </nav>
+    <div class="drawer-demo">PLATAFORMA DEMO<br><span>Fichas virtuales · sin dinero real</span></div>
+  </aside>
+  <div class="backdrop" id="backdrop"></div>
+
+  <main id="app"></main>
+
+<script>
+const app=document.getElementById('app');
+const drawer=document.getElementById('drawer');
+const backdrop=document.getElementById('backdrop');
+const menuBtn=document.getElementById('menuBtn');
+const closeBtn=document.getElementById('closeBtn');
+const loginBtn=document.getElementById('loginBtn');
+
+const slots=[
+  {id:'jewel-rush',src:'/assets/slot-1.jpg',name:'Gods of Ireland'},
+  {id:'cosmic-slots',src:'/assets/slot-2.jpg',name:'Mystic Spirits'},
+  {id:'galaxy-roulette',src:'/assets/slot-3-partial.jpg',name:'Golden Rich'}
+];
+const live=[
+  {src:'/assets/live-1.jpg',name:'Live Baccarat'},
+  {src:'/assets/live-2.jpg',name:'Sunmac Roulette'},
+  {src:'/assets/live-3-partial.jpg',name:'Live Blackjack'}
+];
+
+function openMenu(){drawer.classList.add('open');backdrop.classList.add('show');drawer.setAttribute('aria-hidden','false')}
+function closeMenu(){drawer.classList.remove('open');backdrop.classList.remove('show');drawer.setAttribute('aria-hidden','true')}
+menuBtn.onclick=openMenu;closeBtn.onclick=closeMenu;backdrop.onclick=closeMenu;
+loginBtn.onclick=()=>alert('El inicio de sesión se conectará al backend en la siguiente etapa.');
+
+document.addEventListener('click',e=>{
+ const el=e.target.closest('[data-route]');
+ if(el){e.preventDefault();location.hash=el.dataset.route;closeMenu();}
+ const game=e.target.closest('[data-game]');
+ if(game){e.preventDefault();location.hash='game/'+game.dataset.game;}
+});
+
+function renderHome(){
+ app.innerHTML=`
+  <section class="hero-carousel">
+    <img src="/assets/hero-universe.jpg" alt="Universe Game" class="hero-image">
+    <button class="carousel-arrow left" aria-label="Anterior">‹</button>
+    <button class="carousel-arrow right" aria-label="Siguiente">›</button>
+    <div class="dots"><span class="active"></span><span></span><span></span></div>
+  </section>
+
+  <section class="section selection">
+    <h2>NUESTRA SELECCIÓN PARA TI</h2>
+    <div class="promo-stack">
+      <button class="promo-card"><img src="/assets/banner-roulette.jpg" alt="Premium Live Roulette"></button>
+      <button class="promo-card blackjack"><img src="/assets/banner-blackjack.jpg" alt="Blackjack y Baccarat"></button>
+    </div>
+  </section>
+
+  <section class="section sports" id="sports">
+    <h2>APUESTAS DEPORTIVAS</h2>
+    <button class="wide-card" data-route="sports"><img src="/assets/sports-banner.jpg" alt="Las mejores ligas están aquí"></button>
+  </section>
+
+  <section class="section games-section" id="games">
+    <h2>MÁS DE 2000 TRAGAMONEDAS</h2>
+    <div class="horizontal-strip slots-strip">
+      ${slots.map(s=>`<button class="thumb" data-game="${s.id}"><img src="${s.src}" alt="${s.name}"></button>`).join('')}
+    </div>
+  </section>
+
+  <section class="section live-section">
+    <h2>MESAS EN VIVO SELECCIONADAS</h2>
+    <div class="horizontal-strip live-strip">
+      ${live.map((s,i)=>`<button class="live-card" data-game="${i===0?'galaxy-roulette':'cosmic-slots'}"><img src="${s.src}" alt="${s.name}"></button>`).join('')}
+    </div>
+  </section>
+
+  <section class="social"><h3>¡Síguenos en nuestras redes sociales!</h3><div class="social-icons"><span>f</span><span>◎</span><span>in</span><span>♥</span></div></section>
+  ${footer()}`;
+}
+function footer(){return `<footer><img src="/assets/footer-logo.jpg" alt="Universe Game" class="footer-logo"><p>© Universegame.co</p><div class="footer-block"><h3>PRODUCTOS</h3><span>Slots</span><span>Casino en vivo</span><span>CraZy Win!</span></div><div class="footer-block"><h3>NOSOTROS</h3></div></footer>`}
+function renderSimple(title,text){app.innerHTML=`<section class="simple"><h1>${title}</h1><p>${text}</p><button class="back-home" data-route="home">← Volver al inicio</button></section>${footer()}`}
+function renderGame(id){
+ const names={'jewel-rush':'Jewel Rush','cosmic-slots':'Cosmic Slots','galaxy-roulette':'Galaxy Roulette'};
+ app.innerHTML=`<section class="game-screen"><button class="back-home" data-route="home">← VOLVER</button><h1>${names[id]||'Juego'}</h1><div class="game-demo"><div class="fake-game-icon">✦</div><p>Juego de demostración</p><button onclick="alert('Demo: próximamente conectado al backend.')">JUGAR</button></div></section>`;
+}
+function route(){const h=location.hash.slice(1);if(h.startsWith('game/'))renderGame(h.split('/')[1]);else if(h==='sports')renderSimple('APUESTAS DEPORTIVAS','El sportsbook se conectará al proveedor de cuotas en la siguiente etapa.');else if(h==='casino'||h==='games')renderHome();else renderHome()}
+window.addEventListener('hashchange',route);route();
+</script>
+</body>
+</html>
