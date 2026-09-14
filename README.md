@@ -1,22 +1,17 @@
-# Universe Game — Casino Demo v2
+# Universe Game — Panel administrativo
 
-Segunda versión de prueba de la plataforma de jugadores, basada en las capturas de referencia suministradas.
+Primer prototipo visual del panel administrativo de Universe Game, basado en las capturas de referencia suministradas.
 
 ## Incluye
-- Home móvil con header negro, menú hamburguesa e inicio de sesión.
-- Hero/carrusel de Universe Game.
-- Selección de casino con banners apilados.
-- Apuestas deportivas.
-- Carrusel horizontal de tragamonedas.
-- Carrusel horizontal de mesas en vivo.
-- Bloque de redes sociales.
-- Footer.
-- Navegación de demo y juegos de prueba.
-- Imágenes organizadas en `assets/` para poder reemplazarlas después.
+- Pantalla de ingreso con campos de usuario y contraseña.
+- Panel con carga rápida y botones de alta de usuario/agente.
+- Gráficos visuales de Netwin mensual y diario.
+- Resumen de los agentes destacados del mes.
+- Menú lateral desplegable que replica la navegación de la referencia.
 - Backend Express con health check y fallback compatible con Express 5.
 
 ## Importante
-Esta es una demo visual con fichas virtuales. No procesa dinero real ni pagos.
+Esta es una demo visual con fichas virtuales. El ingreso solo muestra el panel de demostración y no valida credenciales ni procesa dinero real o pagos.
 
 ## Ejecutar
 ```bash
@@ -26,4 +21,4 @@ npm start
 Luego abrir `http://localhost:3000`.
 
 ## Próxima etapa
-Panel administrativo de prueba y, posteriormente, conexión del panel con el contenido del casino para administrar banners, logos, colores y otros slots sin editar el código.
+Conectar las opciones de navegación y los datos del panel a servicios reales.

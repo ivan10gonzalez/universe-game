@@ -3,111 +3,53 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="theme-color" content="#000000" />
-  <title>Universe Game</title>
+  <meta name="theme-color" content="#3e4654" />
+  <title>Panel | Universe Game</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
-  <header class="topbar">
-    <button class="hamburger" id="menuBtn" aria-label="Abrir menú"><i></i><i></i><i></i></button>
-    <button class="login-btn" id="loginBtn" aria-label="Iniciar sesión"><span class="login-icon" aria-hidden="true"><svg viewBox="0 0 40 40"><path d="M16 5h14a3 3 0 0 1 3 3v24a3 3 0 0 1-3 3H16"/><path d="M22 20H5M5 20l7-7M5 20l7 7"/></svg></span> <span>Iniciar sesión</span></button>
-  </header>
-
-  <aside class="drawer" id="drawer" aria-hidden="true">
-    <div class="drawer-top"><div class="drawer-brand">UNIVERSE<br><strong>game</strong></div><button id="closeBtn">×</button></div>
-    <nav>
-      <a href="#home" data-route="home">Inicio</a>
-      <a href="#casino" data-route="casino">Casino</a>
-      <a href="#sports" data-route="sports">Apuestas deportivas</a>
-      <a href="#games" data-route="games">Juegos</a>
-    </nav>
-    <div class="drawer-demo">PLATAFORMA DEMO<br><span>Fichas virtuales · sin dinero real</span></div>
-  </aside>
-  <div class="backdrop" id="backdrop"></div>
-
+  <div class="site-heading"><span>Panel</span><b>›</b></div>
   <main id="app"></main>
 
-<script>
-const app=document.getElementById('app');
-const drawer=document.getElementById('drawer');
-const backdrop=document.getElementById('backdrop');
-const menuBtn=document.getElementById('menuBtn');
-const closeBtn=document.getElementById('closeBtn');
-const loginBtn=document.getElementById('loginBtn');
-
-const slots=[
-  {id:'jewel-rush',src:'/assets/slot-1.jpg',name:'Gods of Ireland'},
-  {id:'cosmic-slots',src:'/assets/slot-2.jpg',name:'Mystic Spirits'},
-  {id:'galaxy-roulette',src:'/assets/slot-3-partial.jpg',name:'Golden Rich'}
-];
-const live=[
-  {src:'/assets/live-1.jpg',name:'Live Baccarat'},
-  {src:'/assets/live-2.jpg',name:'Sunmac Roulette'},
-  {src:'/assets/live-3-partial.jpg',name:'Live Blackjack'}
-];
-
-function openMenu(){drawer.classList.add('open');backdrop.classList.add('show');drawer.setAttribute('aria-hidden','false')}
-function closeMenu(){drawer.classList.remove('open');backdrop.classList.remove('show');drawer.setAttribute('aria-hidden','true')}
-menuBtn.onclick=openMenu;closeBtn.onclick=closeMenu;backdrop.onclick=closeMenu;
-loginBtn.onclick=()=>alert('El inicio de sesión se conectará al backend en la siguiente etapa.');
-
-document.addEventListener('click',e=>{
- const el=e.target.closest('[data-route]');
- if(el){e.preventDefault();location.hash=el.dataset.route;closeMenu();}
- const game=e.target.closest('[data-game]');
- if(game){e.preventDefault();location.hash='game/'+game.dataset.game;}
-});
-
-function renderHome(){
- app.innerHTML=`
-  <section class="hero-carousel">
-    <img src="/assets/hero-universe.jpg" alt="Universe Game" class="hero-image">
-    <button class="carousel-arrow left" aria-label="Anterior">‹</button>
-    <button class="carousel-arrow right" aria-label="Siguiente">›</button>
-    <div class="dots"><span class="active"></span><span></span><span></span></div>
-  </section>
-
-  <section class="section selection">
-    <h2>NUESTRA SELECCIÓN PARA TI</h2>
-    <div class="promo-stack">
-      <button class="promo-card"><img src="/assets/banner-roulette.jpg" alt="Premium Live Roulette"></button>
-      <button class="promo-card blackjack"><img src="/assets/banner-blackjack.jpg" alt="Blackjack y Baccarat"></button>
-    </div>
-  </section>
-
-  <section class="section sports" id="sports">
-    <h2>APUESTAS DEPORTIVAS</h2>
-    <button class="wide-card" data-route="sports"><img src="/assets/sports-banner.jpg" alt="Las mejores ligas están aquí"></button>
-  </section>
-
-  <section class="section games-section" id="games">
-    <h2>MÁS DE 2000 TRAGAMONEDAS</h2>
-    <div class="horizontal-strip slots-strip">
-      ${slots.map(s=>`<button class="thumb" data-game="${s.id}"><img src="${s.src}" alt="${s.name}"></button>`).join('')}
-    </div>
-  </section>
-
-  <section class="section live-section">
-    <h2>MESAS EN VIVO SELECCIONADAS</h2>
-    <div class="horizontal-strip live-strip">
-      ${live.map((s,i)=>`<button class="live-card" data-game="${i===0?'galaxy-roulette':'cosmic-slots'}"><img src="${s.src}" alt="${s.name}"></button>`).join('')}
-    </div>
-  </section>
-
-  <section class="social"><h3>¡Síguenos en nuestras redes sociales!</h3><div class="social-icons"><span>f</span><span>◎</span><span>in</span><span>♥</span></div></section>
-  ${footer()}`;
-}
-function footer(){return `<footer><img src="/assets/footer-logo.jpg" alt="Universe Game" class="footer-logo"><p>© Universegame.co</p><div class="footer-block"><h3>PRODUCTOS</h3><span>Slots</span><span>Casino en vivo</span><span>CraZy Win!</span></div><div class="footer-block"><h3>NOSOTROS</h3></div></footer>`}
-function renderSimple(title,text){app.innerHTML=`<section class="simple"><h1>${title}</h1><p>${text}</p><button class="back-home" data-route="home">← Volver al inicio</button></section>${footer()}`}
-function renderGame(id){
- const names={'jewel-rush':'Jewel Rush','cosmic-slots':'Cosmic Slots','galaxy-roulette':'Galaxy Roulette'};
- app.innerHTML=`<section class="game-screen"><button class="back-home" data-route="home">← VOLVER</button><h1>${names[id]||'Juego'}</h1><div class="game-demo"><div class="fake-game-icon">✦</div><p>Juego de demostración</p><button onclick="alert('Demo: próximamente conectado al backend.')">JUGAR</button></div></section>`;
-}
-function route(){const h=location.hash.slice(1);if(h.startsWith('game/'))renderGame(h.split('/')[1]);else if(h==='sports')renderSimple('APUESTAS DEPORTIVAS','El sportsbook se conectará al proveedor de cuotas en la siguiente etapa.');else if(h==='casino'||h==='games')renderHome();else renderHome()}
-window.addEventListener('hashchange',route);route();
-</script>
+  <script>
+    const app = document.getElementById('app');
+    const icon = (name, cls = '') => `<svg class="icon ${cls}" aria-hidden="true"><use href="#i-${name}"></use></svg>`;
+    const menuItems = [
+      ['pie', 'Estadísticas', true, '›'], ['users-cog', 'Usuarios', false, '›'],
+      ['brain', 'Reportes Globales', false, '⌄'], ['coins', 'Reportes de Fichas', false, '⌄'],
+      ['dice', 'Reportes de Juegos', false, '⌄'], ['money', 'Finanzas', false, '⌄'],
+      ['file-money', 'Mi resumen', false, '›'], ['file', 'Sliders', false, '›'],
+      ['gear', 'Categorías', false, '›'], ['chat', 'Chat Soporte', false, '›'],
+      ['history', 'Registro de actividad', false, '›'], ['gears', 'Setting', false, '›'], ['mail', 'Soporte', false, '›']
+    ];
+    function shell(content) {
+      return `<header class="admin-bar"><button class="menu-button" id="menuButton" aria-label="Abrir menú">${icon('menu')}</button><div class="account"><span>${icon('coins')}</span><strong>4.962.642,64</strong><span>${icon('chat')}</span><span>${icon('agent')}</span><small>⌄</small></div></header>${content}`;
+    }
+    function renderLogin() {
+      document.body.classList.remove('is-dashboard');
+      app.innerHTML = `<section class="login-page"><form class="login-card" id="loginForm"><div class="login-title">${icon('user')}<span>Ingreso</span></div><div class="fields"><label>${icon('user')}<input required aria-label="Nombre de usuario" placeholder="Nombre de usuario"></label><label>${icon('lock')}<input required type="password" aria-label="Contraseña" placeholder="Contraseña"></label></div><button class="gradient-button" type="submit">INGRESAR</button></form></section>`;
+      document.getElementById('loginForm').addEventListener('submit', e => { e.preventDefault(); renderDashboard(); });
+    }
+    function lineChart(type) {
+      const daily = type === 'daily';
+      const points = daily ? '30,118 100,69 170,142 240,65 310,105 380,111 450,57 520,125 590,166 660,180' : '24,181 80,177 136,174 192,174 248,176 304,177 360,74 416,32 472,30 528,70 584,27 640,69 696,143';
+      const area = daily ? '30,118 100,69 170,142 240,65 310,105 380,111 450,57 520,125 590,166 660,180 660,215 30,215' : '24,181 80,177 136,174 192,174 248,176 304,177 360,74 416,32 472,30 528,70 584,27 640,69 696,143 696,215 24,215';
+      const labels = daily ? ['01','02','03','04','05','06','07','08','09','10'] : ['undefined','Nov-25','Jan-26','Mar-26','May-26','Jul-26','Sep-26'];
+      return `<div class="chart"><div class="y-axis"><span>${daily?'6,000,000':'150,000,000'}</span><span>${daily?'4,000,000':'100,000,000'}</span><span>${daily?'2,000,000':'50,000,000'}</span><span>0</span></div><svg viewBox="0 0 720 235" preserveAspectRatio="none" role="img" aria-label="Gráfico de netwin"><g class="grid"><path d="M24 15H700M24 82H700M24 149H700M24 216H700"/><path d="M24 15V216M92 15V216M160 15V216M228 15V216M296 15V216M364 15V216M432 15V216M500 15V216M568 15V216M636 15V216M700 15V216"/></g><polygon class="area" points="${area}"/><polyline class="chart-line" points="${points}"/>${points.split(' ').map(p=>{let [x,y]=p.split(',');return `<circle cx="${x}" cy="${y}" r="7"/>`}).join('')}</svg><div class="x-axis ${daily?'daily':''}">${labels.map(x=>`<span>${x}</span>`).join('')}</div></div>`;
+    }
+    function renderDashboard() {
+      document.body.classList.add('is-dashboard');
+      app.innerHTML = shell(`<main class="dashboard"><section class="panel quick"><h1>Carga rapida</h1><div class="quick-content"><button class="danger">${icon('user')}NUEVO USUARIO</button><button class="danger">${icon('users')}NUEVO AGENTE</button><label class="username">Nombre de usuario<input aria-label="Nombre de usuario"></label><div class="amount-buttons"><button>+</button><button>−</button></div></div></section><section class="panel"><h2>Netwin Mensual:</h2>${lineChart('monthly')}</section><section class="panel"><h2>Netwin Diario:</h2>${lineChart('daily')}</section><section class="panel agents"><h2>Top Agentes del mes</h2><div class="agents-content"><div class="pie-chart"></div><div class="legend"><span class="red">Admindavid22</span><span class="teal">Blanky</span><span class="orange">carlos2025</span><span class="slate">Mastergonza96</span><span class="dark">Agente3005</span><span>Redsilver</span><span>agente8075</span></div><div class="legend muted"><span>Agente2288</span><span>Monaco</span><span>Barbara2025</span></div></div></section></main><div class="drawer-backdrop" id="drawerBackdrop"></div><aside class="admin-drawer" id="drawer" aria-hidden="true"><div class="universe-logo"><span>UNIVERSE</span><b>game</b></div><nav>${menuItems.map(([i,n,active,arrow])=>`<a class="${active?'active':''}" href="#">${icon(i)}<span>${n}</span><b>${arrow}</b></a>`).join('')}</nav></aside>`);
+      document.getElementById('menuButton').onclick = openDrawer;
+      document.getElementById('drawerBackdrop').onclick = closeDrawer;
+    }
+    function openDrawer(){document.getElementById('drawer').classList.add('open');document.getElementById('drawerBackdrop').classList.add('show');}
+    function closeDrawer(){document.getElementById('drawer').classList.remove('open');document.getElementById('drawerBackdrop').classList.remove('show');}
+    renderLogin();
+  </script>
+  <svg class="svg-defs" xmlns="http://www.w3.org/2000/svg"><symbol id="i-menu" viewBox="0 0 24 24"><path d="M3 5h18M3 12h18M3 19h18"/></symbol><symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="7" r="4"/><path d="M4 21c0-4 3-7 8-7s8 3 8 7"/></symbol><symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M2 20c0-3.5 3-6 7-6s7 2.5 7 6M16 14c3.5 0 6 2 6 5"/></symbol><symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="1"/><path d="M7 10V7a5 5 0 0 1 10 0v3"/></symbol><symbol id="i-coins" viewBox="0 0 24 24"><ellipse cx="11" cy="5" rx="7" ry="3"/><path d="M4 5v5c0 4 14 4 14 0V5M4 10v5c0 4 14 4 14 0v-5M20 8v7"/></symbol><symbol id="i-chat" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 1-9 8l-6 2 2-5a8 8 0 1 1 13-5Z"/></symbol><symbol id="i-agent" viewBox="0 0 24 24"><path d="M7 21h10M9 18l-2-7 5-6 5 6-2 7M8 10h8M12 5V2M5 8l-2-1M19 8l2-1"/><circle cx="9" cy="13" r="1"/><circle cx="15" cy="13" r="1"/></symbol><symbol id="i-pie" viewBox="0 0 24 24"><path d="M11 3v9h9A9 9 0 1 1 11 3Z"/><path d="M14 3a7 7 0 0 1 7 7h-7Z"/></symbol><symbol id="i-users-cog" viewBox="0 0 24 24"><circle cx="8" cy="8" r="3"/><path d="M2 20c0-4 2-7 6-7 2 0 3.5.6 4.6 1.8M17 13l.8 1.4 1.6.4-.4 1.6 1 1.3-1 1.3.4 1.6-1.6.4-.8 1.4-1.5-.7-1.5.7-.8-1.4-1.6-.4.4-1.6-1-1.3 1-1.3-.4-1.6 1.6-.4.8-1.4 1.5.7Z"/></symbol><symbol id="i-brain" viewBox="0 0 24 24"><path d="M9 4a4 4 0 0 0-7 3 4 4 0 0 0 1 7 4 4 0 0 0 6 5m6-15a4 4 0 0 1 7 3 4 4 0 0 1-1 7 4 4 0 0 1-6 5M12 3v18"/></symbol><symbol id="i-dice" viewBox="0 0 24 24"><rect x="3" y="7" width="14" height="14" rx="2" transform="rotate(-45 10 14)"/><circle cx="7" cy="11" r="1"/><circle cx="13" cy="17" r="1"/><circle cx="11" cy="10" r="1"/></symbol><symbol id="i-money" viewBox="0 0 24 24"><path d="M3 18h18M5 18v-3h14v3M8 15V9a4 4 0 0 1 8 0v6"/><path d="M12 5v8M14 7h-3a1.5 1.5 0 1 0 0 3h2a1.5 1.5 0 1 1 0 3h-3"/></symbol><symbol id="i-file-money" viewBox="0 0 24 24"><path d="M5 2h10l4 4v16H5Z M15 2v5h4M12 10v7M14 12h-4M14 15h-4"/></symbol><symbol id="i-file" viewBox="0 0 24 24"><path d="M5 2h10l4 4v16H5Z M15 2v5h4M8 12h8M8 16h8"/></symbol><symbol id="i-gear" viewBox="0 0 24 24"><path d="M12 2l2 3 3.5-.3.5 3.5 3 2-2 3 2 3-3 2-.5 3.5-3.5-.3-2 3-2-3-3.5.3-.5-3.5-3-2 2-3-2-3 3-2 .5-3.5L10 5Z"/><circle cx="12" cy="12" r="3"/></symbol><symbol id="i-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v6h6M12 7v6l-3 2"/></symbol><symbol id="i-gears" viewBox="0 0 24 24"><use href="#i-gear"/><circle cx="19" cy="18" r="3"/></symbol><symbol id="i-mail" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="1"/><path d="m3 7 9 6 9-6"/></symbol></svg>
 </body>
 </html>
