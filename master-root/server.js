@@ -13,8 +13,13 @@ app.get('/api/health', (_req, res) => {
   res.json({ ok: true, service: 'universe-master-root' });
 });
 
-app.get('*', (_req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/')) {
+    return res.status(404).json({ error: 'Ruta API no encontrada.' });
+  }
+  res.sendFile(path.join(__dirname, 'index.html'), (err) => {
+    if (err) next(err);
+  });
 });
 
 app.listen(PORT, '0.0.0.0', () => {
