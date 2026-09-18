@@ -1,15 +1,8 @@
 {
-  "name": "universe-master-root",
-  "version": "1.0.0",
+  "name": "universe-game",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
-  "scripts": {
-    "start": "node server.js"
-  },
-  "engines": {
-    "node": ">=18"
-  },
-  "dependencies": {
-    "express": "^5.1.0"
-  }
+  "scripts": { "start": "node server.js", "test": "node --test tests/server.test.js" },
+  "engines": { "node": ">=18" }
 }
