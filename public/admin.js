@@ -6,7 +6,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenu();
 document.querySelector('#adminLogout').addEventListener('click', logout);
 const dashboard = document.querySelector('#dashboard'), manager = document.querySelector('#bannerManager');
 const bannerItem = [...document.querySelectorAll('.menu-item')].find(item => item.textContent.includes('Banners Inicio'));
-function showBanners() { dashboard.classList.add('hidden'); manager.classList.remove('hidden'); closeMenu(); window.scrollTo(0, 0); reload().catch(report); }
+function showBanners() { document.dispatchEvent(new Event('show-banners')); dashboard.classList.add('hidden'); manager.classList.remove('hidden'); closeMenu(); window.scrollTo(0, 0); reload().catch(report); }
 bannerItem.setAttribute('role', 'button'); bannerItem.tabIndex = 0; bannerItem.addEventListener('click', showBanners); bannerItem.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); showBanners(); } });
 document.querySelector('#backDashboard').addEventListener('click', () => { manager.classList.add('hidden'); dashboard.classList.remove('hidden'); });
 const form = document.querySelector('#bannerForm'), list = document.querySelector('#bannerList'), preview = document.querySelector('#bannerPreview'), message = document.querySelector('#bannerMessage');
@@ -45,4 +45,4 @@ form.addEventListener('submit', async event => {
     destination = fields.destination.value; document.querySelectorAll('[data-destination]').forEach(b => b.classList.toggle('selected', b.dataset.destination === destination)); reset(); await reload(); report('Banner guardado. Ya está disponible en la plataforma.');
   } catch (e) { report(e); } finally { save.disabled = false; }
 });
-try { const { user } = await api('/api/me'); if (user.role !== 'admin') location.replace('/jugadores'); document.querySelector('#adminBalance').textContent = Number(user.balance).toLocaleString('es-AR', {minimumFractionDigits: 2}); } catch (e) { report(e); }
+try { const { user } = await api('/api/me'); if (!['admin', 'agent'].includes(user.role)) location.replace('/jugadores'); if (user.role === 'agent') bannerItem.hidden = true; document.querySelector('#adminBalance').textContent = Number(user.balance).toLocaleString('es-AR', {minimumFractionDigits: 2}); } catch (e) { report(e); }

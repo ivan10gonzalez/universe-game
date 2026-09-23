@@ -116,7 +116,7 @@ const server = http.createServer(async (req, res) => {
       const token = crypto.randomBytes(32).toString('hex');
       sessions.set(tokenHash(token), { userId: found.id, expires: Date.now() + 28800000 });
       res.setHeader('Set-Cookie', cookie(req, token, 28800));
-      return json(res, 200, { user: publicUser(found), redirect: found.role === 'admin' ? '/admin' : '/jugadores' });
+      return json(res, 200, { user: publicUser(found), redirect: found.role !== 'player' ? '/admin' : '/jugadores' });
     }
     if (route === '/api/logout' && req.method === 'POST') {
       if (auth) sessions.delete(auth.key);
@@ -126,6 +126,24 @@ const server = http.createServer(async (req, res) => {
       if (!user) return json(res, 401, { error: 'Iniciá sesión para continuar.' });
       if (route === '/api/me' && req.method === 'GET') return json(res, 200, { user: publicUser(user) });
       if (route === '/api/banners' && req.method === 'GET') return json(res, 200, { banners: db.banners.filter(b => b.active && b.destination === url.searchParams.get('destination')).sort((a, b) => a.order - b.order) });
+      if (route === '/api/panel/users') {
+        if (!['admin', 'agent'].includes(user.role)) return json(res, 403, { error: 'Acceso no autorizado.' });
+        if (req.method === 'GET') return json(res, 200, { users: db.users.filter(u => u.role !== 'admin' && (user.role === 'admin' || u.parentId === user.id)).map(u => ({ ...publicUser(u), hidden: !!u.hidden, parentId: u.parentId || null })) });
+        if (req.method === 'POST') {
+          const input = await body(req);
+          if (!['player', 'agent'].includes(input.role) || (user.role === 'agent' && input.role !== 'player')) return json(res, 403, { error: 'No podés crear este tipo de cuenta.' });
+          if (typeof input.username !== 'string' || !/^[a-zA-Z0-9_.-]{3,40}$/.test(input.username.trim()) || typeof input.password !== 'string' || input.password.length < 8 || input.password.length > 128) return json(res, 400, { error: 'Usá un usuario de 3 a 40 letras, números, puntos o guiones y una contraseña de 8 a 128 caracteres.' });
+          if (db.users.some(u => u.username.toLowerCase() === input.username.trim().toLowerCase())) return json(res, 409, { error: 'Ese usuario ya existe.' });
+          const profile = {};
+          for (const key of ['fullName', 'document', 'email', 'phone']) {
+            if (input[key] !== undefined && (typeof input[key] !== 'string' || input[key].length > 160)) return json(res, 400, { error: 'Revisá los datos personales.' });
+            profile[key] = (input[key] || '').trim();
+          }
+          if (profile.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profile.email)) return json(res, 400, { error: 'Revisá el correo electrónico.' });
+          const created = { id: crypto.randomUUID(), username: input.username.trim(), passwordHash: hashPassword(input.password), role: input.role, balance: 0, parentId: user.id, profile, permissions: [], createdAt: new Date().toISOString() };
+          db.users.push(created); save(); return json(res, 201, { user: publicUser(created) });
+        }
+      }
       if (route.startsWith('/api/admin/')) {
         if (user.role !== 'admin') return json(res, 403, { error: 'Acceso exclusivo para administradores.' });
         if (route === '/api/admin/banners' && req.method === 'GET') return json(res, 200, { banners: [...db.banners].sort((a, b) => a.order - b.order) });
@@ -152,7 +170,7 @@ const server = http.createServer(async (req, res) => {
     if (route === '/' || route === '/index.html') return file(res, path.join(root, 'index.html'));
     if (route === '/admin' || route === '/admin.html') {
       if (!user) return redirect(res, '/');
-      if (user.role !== 'admin') return redirect(res, '/jugadores');
+      if (!['admin', 'agent'].includes(user.role)) return redirect(res, '/jugadores');
       return file(res, path.join(root, 'admin.html'));
     }
     if (/^\/jugadores(?:\/(slots|casino|deportes|caballos|crazzy))?\/?$/.test(route)) {

@@ -81,6 +81,23 @@ test('Autenticación, autorización, banners y persistencia real', async t => {
       assert.ok(after.banners.some(b => b.id === home.id && b.title === 'Editado')); assert.ok(!after.banners.some(b => b.id === slots.id));
       assert.equal((await request(home.image, 'GET', undefined, player.cookie)).status, 200);
     });
+    await t.test('alta de usuarios: datos, roles, aislamiento y persistencia', async () => {
+      const input = {username:'nuevo_jugador',password:'ClaveSegura123!',role:'player',fullName:'Cuenta de prueba',permissions:['unconfigured'],balance:999};
+      assert.equal((await request('/api/panel/users','POST',input,player.cookie)).status,403);
+      const created=await request('/api/panel/users','POST',input,admin.cookie);assert.equal(created.status,201);assert.equal(created.data.user.balance,0);
+      assert.equal((await request('/api/panel/users','POST',{...input,username:'NUEVO_JUGADOR'},admin.cookie)).status,409);
+      assert.equal((await request('/api/panel/users','POST',{...input,username:'otro',role:'admin'},admin.cookie)).status,403);
+      const agent=await request('/api/panel/users','POST',{...input,username:'nuevo_agente',role:'agent'},admin.cookie);assert.equal(agent.status,201);
+      const session=await login('agent',input.password,'nuevo_agente');assert.equal(session.data.redirect,'/admin');
+      assert.equal((await request('/api/admin/banners','GET',undefined,session.cookie)).status,403);
+      assert.equal((await request('/api/panel/users','GET',undefined,session.cookie)).data.users.length,0);
+      assert.equal((await request('/api/panel/users','POST',{...input,username:'otro_agente',role:'agent'},session.cookie)).status,403);
+      assert.equal((await request('/api/panel/users','POST',{...input,username:'hijo_agente'},session.cookie)).status,201);
+      const scoped=(await request('/api/panel/users','GET',undefined,session.cookie)).data.users;assert.equal(scoped.length,1);assert.equal(scoped[0].username,'hijo_agente');assert.equal('passwordHash' in scoped[0],false);
+      await stop();await start();
+      assert.equal((await login('player',input.password,input.username)).status,200);
+      const stored=JSON.parse(fs.readFileSync(dbPath)).users.find(u=>u.username===input.username);assert.equal(stored.profile.fullName,input.fullName);assert.deepEqual(stored.permissions,[]);assert.equal(stored.balance,0);
+    });
     await stop();
     await t.test('un nombre preexistente no se sobrescribe y la contraseña modificada se conserva', async () => {
       const conflictDir = fs.mkdtempSync(path.join(os.tmpdir(), 'universe-conflict-'));
