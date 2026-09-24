@@ -121,6 +121,7 @@ for(const item of document.querySelectorAll('.menu-item')) {
   if(label==='Usuarios')action=showUsers;
   if(label==='Reportes Globales') { const sub=el('div','report-submenu');sub.hidden=true;sub.append(button('Reporte por Agente',()=>showReport()),button('Reporte por Jugador',()=>showReport(true)));item.after(sub);item.setAttribute('aria-expanded','false');action=()=>{sub.hidden=!sub.hidden;item.setAttribute('aria-expanded',String(!sub.hidden));}; }
   if(label==='Settings')action=settings;
+  if(label==='Torneos')action=()=>soon('Torneos');
   if(['Soporte','Chat Soporte','Registro de actividad'].includes(label))action=()=>soon(label);
   if(label==='Reportes de Fichas')action=()=>reportBase(label,['Fecha','Usuario','Movimiento','Fichas'],'Sin movimientos de fichas registrados.');
   if(label==='Reportes de Juegos')action=()=>reportBase(label,['Fecha','Usuario','Juego','Resultado'],'Sin actividad de juegos registrada.');
