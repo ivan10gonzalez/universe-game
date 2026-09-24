@@ -5,13 +5,13 @@ const screen = el('main', 'panel-screen hidden'); dashboard.after(screen);
 let currentUser, users = [], filter = 'all', query = '', page = 1, pageSize = 10;
 const money = value => Number(value).toLocaleString('es-AR', { minimumFractionDigits: 2 });
 function closeMenu() { $('#sideMenu').classList.remove('open'); $('#menuOverlay').classList.add('hidden'); }
-function show(view) { dashboard.classList.toggle('hidden', view !== 'dashboard'); $('#bannerManager').classList.add('hidden'); screen.classList.toggle('hidden', view === 'dashboard'); closeMenu(); window.scrollTo(0, 0); }
+function show(view) { screen.classList.toggle('users-screen', view === 'users'); dashboard.classList.toggle('hidden', view !== 'dashboard'); $('#bannerManager').classList.add('hidden'); screen.classList.toggle('hidden', view === 'dashboard'); closeMenu(); window.scrollTo(0, 0); }
 document.addEventListener('show-banners', () => screen.classList.add('hidden'));
 function button(text, action, className = 'panel-button') { const b = el('button', className, text); b.type = 'button'; b.addEventListener('click', action); return b; }
 function field(label, name, type = 'text') { const l = el('label', 'panel-field', label), input = el('input'); input.name = name; input.type = type; input.maxLength = 160; l.append(input); return l; }
 function empty(text) { return el('p', 'panel-empty', text); }
 const dialog = el('dialog', 'user-dialog');
-dialog.innerHTML = `<form id="newUserForm" novalidate><div class="role-tabs" aria-label="Tipo de cuenta"><button type="button" data-role="player">♟ Jugador</button><button type="button" data-role="agent">♟ Agente</button></div><h2 class="sr-only">Crear cuenta</h2><div class="form-tabs" role="tablist"></div><div class="user-fields"></div><p class="form-feedback" role="status"></p><footer><button type="button" class="panel-button outline" id="cancelUser">CANCELAR</button><button class="panel-button" type="submit" id="saveUser">ACEPTAR</button></footer></form>`;
+dialog.innerHTML = `<form id="newUserForm" novalidate><div class="role-tabs" aria-label="Tipo de cuenta"><button type="button" data-role="player"><i class="fa-solid fa-user-plus" aria-hidden="true"></i> Jugador</button><button type="button" data-role="agent"><i class="fa-solid fa-user-plus" aria-hidden="true"></i> Agente</button></div><h2 class="sr-only">Crear cuenta</h2><div class="form-tabs" role="tablist"></div><div class="user-fields"></div><p class="form-feedback" role="status"></p><footer><button type="button" class="panel-button outline" id="cancelUser">CANCELAR</button><button class="panel-button" type="submit" id="saveUser">ACEPTAR</button></footer></form>`;
 document.body.append(dialog);
 const form = $('#newUserForm'), tabs = dialog.querySelector('.form-tabs'), content = dialog.querySelector('.user-fields'), feedback = dialog.querySelector('.form-feedback');
 let role = 'player', selectedTab = 'Ingreso', saving = false;
@@ -19,8 +19,10 @@ const panels = {};
 panels.Ingreso = el('section');
 const username = field('Nombre de usuario', 'username'), password = field('Contraseña', 'password', 'password');
 username.querySelector('input').autocomplete = 'off'; password.querySelector('input').autocomplete = 'new-password';
-password.append(button('Mostrar contraseña', e => { const i = password.querySelector('input'); i.type = i.type === 'password' ? 'text' : 'password'; e.currentTarget.textContent = i.type === 'password' ? 'Mostrar contraseña' : 'Ocultar contraseña'; }, 'password-toggle'));
-panels.Ingreso.append(username, password, el('small', '', 'Contraseña: mínimo 8 caracteres.'));
+username.classList.add('username-field'); password.classList.add('password-field');
+username.insertAdjacentHTML('afterbegin','<i class="fa-solid fa-user" aria-hidden="true"></i>');
+password.append(button('', e => { const i = password.querySelector('input'); i.type = i.type === 'password' ? 'text' : 'password'; e.currentTarget.setAttribute('aria-label',i.type === 'password' ? 'Mostrar contraseña' : 'Ocultar contraseña');e.currentTarget.classList.toggle('revealed',i.type==='text');e.currentTarget.classList.toggle('fa-eye',i.type==='text');e.currentTarget.classList.toggle('fa-eye-slash',i.type==='password'); }, 'password-toggle fa-solid fa-eye-slash'));
+password.querySelector('button').setAttribute('aria-label','Mostrar contraseña');password.querySelector('input').placeholder='Contraseña';password.querySelector('input').title='Mínimo 8 caracteres';panels.Ingreso.append(username, password);
 panels['Datos personales'] = el('section');
 for (const [label, name, type] of [['Nombre completo','fullName','text'],['Documento','document','text'],['Correo electrónico','email','email'],['Teléfono','phone','tel']]) panels['Datos personales'].append(field(label,name,type));
 panels.Permisos = el('section'); panels.Permisos.append(empty('No hay proveedores configurados. Aparecerán aquí cuando se agreguen desde el panel.'));
@@ -35,7 +37,7 @@ function renderTabs() {
   dialog.querySelectorAll('[data-role]').forEach(b => { b.classList.toggle('selected', b.dataset.role === role); b.setAttribute('aria-pressed', String(b.dataset.role === role)); });
 }
 dialog.querySelectorAll('[data-role]').forEach(b => b.addEventListener('click', () => { if (saving) return; role = b.dataset.role; selectedTab = 'Ingreso'; renderTabs(); }));
-function openUser(type = 'player') { form.reset(); role = type; selectedTab = 'Ingreso'; feedback.textContent = ''; password.querySelector('input').type = 'password'; password.querySelector('button').textContent = 'Mostrar contraseña'; renderTabs(); dialog.showModal(); document.body.classList.add('modal-open'); username.querySelector('input').focus(); }
+function openUser(type = 'player') { form.reset(); role = type; selectedTab = 'Ingreso'; feedback.textContent = ''; password.querySelector('input').type = 'password'; password.querySelector('button').setAttribute('aria-label','Mostrar contraseña');password.querySelector('button').classList.remove('revealed','fa-eye');password.querySelector('button').classList.add('fa-eye-slash'); renderTabs(); dialog.showModal(); document.body.classList.add('modal-open'); username.querySelector('input').focus(); }
 dialog.addEventListener('close', () => document.body.classList.remove('modal-open'));
 dialog.addEventListener('cancel', e => { if (saving) e.preventDefault(); });
 $('#cancelUser').addEventListener('click', () => dialog.close());
@@ -51,23 +53,24 @@ form.addEventListener('submit', async e => {
 const quick = document.querySelectorAll('.quick-actions button'); quick[0].addEventListener('click', () => openUser()); quick[1].addEventListener('click', () => openUser('agent'));
 async function showUsers() { show('users'); screen.replaceChildren(empty('Cargando usuarios…')); try { ({ users } = await api('/api/panel/users')); renderUsers(); } catch(e) { screen.replaceChildren(empty(e.message)); } }
 function renderUsers() {
-  screen.replaceChildren();
+  screen.classList.add('users-screen');screen.replaceChildren();
   const actions = el('div','panel-actions'); actions.append(button('NUEVO USUARIO', () => openUser(), 'red-btn'), button('ESTRUCTURA', showStructure, 'red-btn')); screen.append(actions);
-  const card = el('section','panel-card'); const search = el('form','panel-search'), input = field('Nombre de usuario','search'); input.querySelector('input').value = query;
+  const card = el('section','panel-card'); const search = el('form','panel-search'), input = field('','search'); input.querySelector('input').placeholder='Nombre de usuario';input.querySelector('input').setAttribute('aria-label','Nombre de usuario');input.querySelector('input').value = query;
   const submit = el('button','panel-button','BUSCAR'); search.append(input,submit); search.addEventListener('submit', e => { e.preventDefault(); query = input.querySelector('input').value; page = 1; renderUsers(); }); card.append(search);
   const filters = el('div','list-tabs'); for (const [key,label] of [['all','TODOS'],['agent','AGENTES'],['player','JUGADORES'],['hidden','OCULTOS']]) filters.append(button(label, () => { filter=key;page=1;renderUsers(); }, filter === key ? 'selected' : '')); card.append(filters);
   const selected = users.filter(u => u.username.toLowerCase().includes(query.toLowerCase()) && (filter === 'hidden' ? u.hidden : !u.hidden && (filter === 'all' || u.role === filter)));
   const pages = Math.max(1, Math.ceil(selected.length/pageSize)); page = Math.min(page,pages);
   const table = el('table','user-table'); table.innerHTML = '<thead><tr><th>Nombre de usuario</th><th>Fichas</th><th>Acciones</th></tr></thead>'; const body = el('tbody');
   selected.slice((page-1)*pageSize,page*pageSize).forEach(u => {
-    const row = el('tr'), name=el('td','username',u.username), roleLabel=el('small','user-role',u.role==='admin'?'Administrador':u.role==='agent'?'Agente':'Jugador');name.append(roleLabel);
+    const row = el('tr'), name=el('td','username user-'+u.role,u.username), roleLabel=el('small','user-role sr-only',u.role==='admin'?'Administrador':u.role==='agent'?'Agente':'Jugador');name.append(roleLabel);
     const actions=el('td','balance-actions');
     if(u.role!=='admin')for(const [operation,label,symbol] of [['credit','Cargar fichas','+'],['debit','Retirar fichas','−']]){const b=button(symbol,()=>openBalance(u,operation),'balance-action');b.ariaLabel=`${label} a ${u.username}`;b.title=label;actions.append(b);}
     else actions.append(el('span','', '—'));
+    const details=button('≡',()=>{const card=baseScreen('Datos de usuario');card.append(el('h2','',u.username),el('p','',roleLabel.textContent),el('p','',`Saldo: ${money(u.balance)} fichas`),button('VOLVER A USUARIOS',()=>{show('users');renderUsers();}));},'balance-action');details.ariaLabel='Ver datos de '+u.username;details.title='Datos de usuario';actions.append(details);
     row.append(name,el('td','',money(u.balance)),actions);body.append(row);
   });
   if (!selected.length) { const row=el('tr'),cell=el('td','panel-empty','Ningún dato disponible en esta tabla');cell.colSpan=3;row.append(cell);body.append(row); } table.append(body);card.append(table);
-  const pagination = el('div','pagination'); const previous=button('‹',()=>{page--;renderUsers();}),next=button('›',()=>{page++;renderUsers();});previous.disabled=page===1;next.disabled=page===pages; previous.ariaLabel='Página anterior'; next.ariaLabel='Página siguiente';pagination.append(previous,el('span','',`${page} / ${pages}`),next);
+  const pagination = el('div','pagination'); const previous=button('‹',()=>{page--;renderUsers();}),next=button('›',()=>{page++;renderUsers();});previous.disabled=page===1;next.disabled=page===pages; previous.ariaLabel='Página anterior'; next.ariaLabel='Página siguiente';pagination.append(previous);for(let n=Math.max(1,page-2);n<=Math.min(pages,page+2);n++){const number=button(String(n),()=>{page=n;renderUsers();},n===page?'page-number selected':'page-number');if(n===page)number.setAttribute('aria-current','page');pagination.append(number);}pagination.append(next);
   const size = el('label','','Mostrar registros '),select=el('select');for(const n of [10,25,50]){const option=el('option','',String(n));option.value=n;select.append(option);}select.value=pageSize;select.addEventListener('change',()=>{pageSize=Number(select.value);page=1;renderUsers();});size.append(select);pagination.append(size);card.append(pagination);screen.append(card);
 }
 const balanceDialog=el('dialog','balance-dialog');document.body.append(balanceDialog);
@@ -136,10 +139,21 @@ const fake=$('.fake-input');const quickInput=el('input','quick-username');quickI
 for(const b of document.querySelectorAll('.quick-input-row .round-btn')) {b.title=b.textContent==='+'?'Cargar fichas':'Retirar fichas';b.setAttribute('aria-label',b.title);b.addEventListener('click',async()=>{try{const result=await api('/api/panel/users');const account=result.users.find(u=>u.username.toLowerCase()===quickInput.value.trim().toLowerCase()&&u.role!=='admin');if(account)openBalance(account,b.textContent==='+'?'credit':'debit');else{query=quickInput.value;await showUsers();screen.prepend(el('p','panel-notice','Buscá el usuario y elegí + para cargar o − para retirar fichas.'));}}catch(error){show('users');screen.replaceChildren(empty(error.message));}});}
 try { ({user:currentUser}=await api('/api/me')); if(currentUser.role==='agent'){quick[1].hidden=true;dialog.querySelector('[data-role="agent"]').hidden=true;} }catch(e){screen.append(empty(e.message));}
 
-const accountButton = button('▾', () => { accountMenu.hidden = !accountMenu.hidden; accountButton.setAttribute('aria-expanded', String(!accountMenu.hidden)); }, 'account-toggle');
+function closeAccountMenu(){accountMenu.hidden=true;accountButton.setAttribute('aria-expanded','false');}
+const accountButton = button('', () => { accountMenu.hidden = !accountMenu.hidden; accountButton.setAttribute('aria-expanded', String(!accountMenu.hidden)); }, 'account-toggle');
+accountButton.innerHTML='<i class="fa-solid fa-user-secret admin-fa" aria-hidden="true"></i><span aria-hidden="true">▾</span>';
 accountButton.ariaLabel = 'Abrir menú de cuenta'; accountButton.setAttribute('aria-expanded','false');
-const caret = $('.caret-fa'); if(caret) caret.replaceWith(accountButton);
+$('.toolbar-right > .admin-fa')?.remove(); const caret = $('.caret-fa'); if(caret) caret.replaceWith(accountButton);
 const accountMenu = el('div','account-menu'); accountMenu.hidden = true;
-accountMenu.append(button('Mi cuenta', () => { accountMenu.hidden=true;accountButton.setAttribute('aria-expanded','false');show('account');screen.replaceChildren(el('h1','','Mi cuenta'));const card=el('section','panel-card');card.append(el('h2','',currentUser.username),el('p','',currentUser.role==='admin'?'Administrador':'Agente'),el('p','',`Saldo: ${money(currentUser.balance)} fichas`));screen.append(card); }),button('Salir',logout));
+function accountPage(title){closeAccountMenu();return baseScreen(title);}
+function changePassword(){
+  const card=accountPage('Cambiar Contraseña'),f=el('form','settings-form');
+  for(const [label,name] of [['Contraseña actual','currentPassword'],['Nueva contraseña','password'],['Repetir nueva contraseña','confirmation']]){const l=field(label,name,'password'),input=l.querySelector('input');input.required=true;input.maxLength=128;input.autocomplete=name==='currentPassword'?'current-password':'new-password';if(name!=='currentPassword')input.minLength=8;f.append(l);}
+  const status=el('p','form-feedback');status.setAttribute('role','status');const save=el('button','panel-button','GUARDAR');f.append(el('p','settings-note','La nueva contraseña debe tener al menos 8 caracteres.'),status,save);
+  f.addEventListener('submit',async e=>{e.preventDefault();if(save.disabled)return;const values=Object.fromEntries(new FormData(f));if(values.password!==values.confirmation){status.textContent='Las contraseñas no coinciden.';return;}save.disabled=true;status.textContent='';try{await api('/api/account/password',{method:'POST',body:JSON.stringify(values)});f.reset();status.textContent='Contraseña actualizada.';}catch(error){status.textContent=error.message;}finally{save.disabled=false;}});card.append(f);
+}
+async function accountHistory(){const card=accountPage('Historial de Ingresos'),status=empty('Cargando…');card.append(status);try{const {entries}=await api('/api/account/logins');status.textContent=entries.length?'Últimos ingresos a tu cuenta':'Todavía no hay ingresos registrados.';const list=el('ul','account-history');for(const date of entries)list.append(el('li','',new Date(date).toLocaleString('es-AR')));card.append(list);}catch(error){status.textContent=error.message;}}
+accountMenu.append(button('Cambiar Contraseña',changePassword),button('Historial de Ingresos',accountHistory),button('Mi cuenta',()=>{const card=accountPage('Mi cuenta');card.append(el('h2','',currentUser.username),el('p','',currentUser.role==='admin'?'Administrador':'Agente'),el('p','',`Saldo: ${money(currentUser.balance)} fichas`));}),button('Información de contacto',()=>accountPage('Información de contacto').append(empty('Pronto'))),button('Salir',logout));
 $('.toolbar-right').append(accountMenu);
-document.addEventListener('click',e=>{if(!accountMenu.contains(e.target)&&!accountButton.contains(e.target)){accountMenu.hidden=true;accountButton.setAttribute('aria-expanded','false');}});
+document.addEventListener('click',e=>{if(!accountMenu.contains(e.target)&&!accountButton.contains(e.target))closeAccountMenu();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeAccountMenu();});

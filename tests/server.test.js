@@ -124,7 +124,7 @@ test('Autenticación, autorización, banners y persistencia real', async t => {
       assert.equal((await request('/api/panel/users','POST',{...input,username:'NUEVO_JUGADOR'},admin.cookie)).status,409);
       assert.equal((await request('/api/panel/users','POST',{...input,username:'otro',role:'admin'},admin.cookie)).status,403);
       const agent=await request('/api/panel/users','POST',{...input,username:'nuevo_agente',role:'agent'},admin.cookie);assert.equal(agent.status,201);
-      const session=await login('agent',input.password,'nuevo_agente');assert.equal(session.data.redirect,'/admin');
+      const session=await login('agent',input.password,'nuevo_agente');assert.equal(session.data.redirect,'/admin');assert.equal((await request('/admin','GET',undefined,session.cookie)).status,200);
       assert.equal((await request('/api/admin/banners','GET',undefined,session.cookie)).status,403);
       assert.equal((await request('/api/panel/users','GET',undefined,session.cookie)).data.users.length,0);
       assert.equal((await request('/api/panel/users','POST',{...input,username:'otro_agente',role:'agent'},session.cookie)).status,403);
@@ -141,7 +141,7 @@ test('Autenticación, autorización, banners y persistencia real', async t => {
       assert.equal((await request('/api/me','GET',undefined,session.cookie)).data.user.balance,17);
       await stop();await start();
       const persisted=JSON.parse(fs.readFileSync(dbPath));assert.equal(persisted.users.find(u=>u.id===scoped[0].id).balance,3);assert.ok(persisted.balanceMovements.length>=5);
-      assert.equal((await login('player',input.password,input.username)).status,200);
+      const newPlayerLogin=await login('player',input.password,input.username);assert.equal(newPlayerLogin.status,200);assert.equal(newPlayerLogin.data.redirect,'/jugadores');assert.equal((await request('/jugadores','GET',undefined,newPlayerLogin.cookie)).status,200);
       const stored=JSON.parse(fs.readFileSync(dbPath)).users.find(u=>u.username===input.username);assert.equal(stored.profile.fullName,input.fullName);assert.deepEqual(stored.permissions,[]);assert.equal(stored.balance,0);
     });
     await stop();
