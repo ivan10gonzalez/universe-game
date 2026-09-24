@@ -29,7 +29,8 @@ test('Autenticación, autorización, banners y persistencia real', async t => {
     await start();
     await t.test('protege rutas privadas, archivos fuente y datos', async () => {
       assert.equal((await request('/admin')).headers.get('location'), '/');
-      assert.equal((await request('/jugadores/slots')).headers.get('location'), '/');
+      assert.equal((await request('/jugadores')).status, 200);
+      assert.equal((await request('/jugadores/slots')).status, 200);
       assert.equal((await request('/api/me')).status, 401);
       assert.equal((await request('/api/admin/banners')).status, 401);
       for (const route of ['/server.js', '/data/universe.json', '/.git/config', '/package.json']) assert.equal((await request(route)).status, 404);
@@ -58,7 +59,7 @@ test('Autenticación, autorización, banners y persistencia real', async t => {
       const homeList = (await request('/api/banners?destination=home', 'GET', undefined, player.cookie)).data.banners;
       assert.ok(homeList.some(b => b.id === home.id)); assert.ok(!homeList.some(b => b.id === slots.id));
       assert.equal((await request(home.image, 'GET', undefined, player.cookie)).status, 200);
-      assert.equal((await request(home.image)).status, 401);
+      assert.equal((await request(home.image)).status, 200);
       assert.equal((await request('/api/admin/banners', 'POST', { destination: 'home', title: 'Mal archivo', order: 0, active: true, imageData: 'data:image/png;base64,SGVsbG9JbnZhbGlk' }, admin.cookie)).status, 400);
     });
     await t.test('edita, activa y elimina sin resucitar los banners borrados', async () => {
@@ -66,6 +67,24 @@ test('Autenticación, autorización, banners y persistencia real', async t => {
       assert.ok(!(await request('/api/banners?destination=home', 'GET', undefined, player.cookie)).data.banners.some(b => b.id === home.id));
       assert.equal((await request('/api/admin/banners/' + home.id, 'PUT', { ...home, title: 'Editado', order: 1, active: true }, admin.cookie)).status, 200);
       assert.equal((await request('/api/admin/banners/' + slots.id, 'DELETE', undefined, admin.cookie)).status, 200);
+    });
+    await t.test('imágenes inferiores editables y visibles sin sesión', async () => {
+      const initial=(await request('/api/banners?destination=selection')).data.banners;assert.equal(initial.length,2);assert.ok(initial.every(b=>b.image.startsWith('/uploads/')));
+      const b=initial[0];assert.equal((await request('/api/admin/banners/'+b.id,'PUT',{...b,imageData,title:'Nueva selección'},admin.cookie)).status,200);
+      const updated=(await request('/api/banners?destination=selection')).data.banners.find(x=>x.id===b.id);assert.notEqual(updated.image,b.image);assert.equal(updated.title,'Nueva selección');
+      await request('/api/admin/banners/'+b.id,'PUT',{...updated,active:false},admin.cookie);assert.equal((await request(updated.image)).status,401);
+      assert.equal((await request('/api/banners?destination=selection')).data.banners.length,1);
+    });
+    await t.test('contraseña propia e historial privado', async () => {
+      assert.equal((await request('/api/account/logins')).status,401);
+      const history=await request('/api/account/logins','GET',undefined,player.cookie);assert.ok(history.data.entries.length>0);
+      const second=await login('player');
+      assert.equal((await request('/api/account/password','POST',{currentPassword:'mal',password:'NuevaClave123!'},player.cookie)).status,400);
+      assert.equal((await request('/api/account/password','POST',{currentPassword:'UniversePlayer2026!',password:'NuevaClave123!'},player.cookie)).status,200);
+      assert.equal((await request('/api/me','GET',undefined,second.cookie)).status,401);
+      assert.equal((await login('player','NuevaClave123!')).status,200);
+      assert.equal((await login('player')).status,401);
+      await request('/api/account/password','POST',{currentPassword:'NuevaClave123!',password:'UniversePlayer2026!'},player.cookie);
     });
     await t.test('logout invalida la sesión en el servidor', async () => {
       await request('/api/logout', 'POST', {}, player.cookie);

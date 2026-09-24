@@ -26,18 +26,18 @@
     <section class="dashboard-card agents-card"><div class="blue-title">Top Agentes del mes</div><div class="agents-body"><div class="pie"></div><div class="legend"><div><b class="c c1"></b> Admindavid22</div><div><b class="c c10"></b> agente8075</div><div><b class="c c3"></b> Blanky</div><div><b class="c c2"></b> Agente2288</div><div><b class="c c5"></b> carlos2025</div><div><b class="c c4"></b> Monaco</div><div><b class="c c7"></b> Mastergonza96</div><div><b class="c c6"></b> Barbara2025</div><div><b class="c c9"></b> Agente3005</div><div><b class="c c8"></b> Redsilver</div><div><b class="c c10"></b> Raulconde</div></div></div></section>
   </main>
   <main id="bannerManager" class="banner-manager hidden">
-    <div class="banner-heading"><h1>Banners de jugadores</h1><button id="backDashboard">Volver al panel</button></div>
-    <p>Configurá los banners de Inicio y Slots. Los cambios se guardan y se reflejan al abrir o recargar la plataforma.</p>
-    <div class="banner-destinations"><button data-destination="home" class="selected">Inicio</button><button data-destination="slots">Slots</button></div>
+    <div class="banner-heading"><h1>Banners e imágenes de jugadores</h1><button id="backDashboard">Volver al panel</button></div>
+    <p>Configurá los banners de Inicio, Slots y las imágenes inferiores de Selección y Deportes. Los cambios se guardan y se reflejan al abrir o recargar la plataforma.</p>
+    <div class="banner-destinations"><button data-destination="home" class="selected">Inicio</button><button data-destination="slots">Slots</button><button data-destination="selection">Selección</button><button data-destination="sports">Deportes</button></div>
     <form id="bannerForm" class="banner-form">
       <h2 id="formTitle">Nuevo banner</h2>
-      <label>Destino<select id="bannerDestination"><option value="home">Inicio</option><option value="slots">Slots</option></select></label>
+      <label>Destino<select id="bannerDestination"><option value="home">Inicio</option><option value="slots">Slots</option><option value="selection">Selección · imágenes inferiores</option><option value="sports">Deportes · imagen inferior</option></select></label>
       <label>Título / texto alternativo<input id="bannerTitle" required maxlength="120"></label>
       <label>Subtítulo<input id="bannerSubtitle" maxlength="160"></label>
       <label>Orden<input id="bannerOrder" type="number" min="0" max="9999" value="0" required></label>
       <label class="check-label"><input id="bannerActive" type="checkbox" checked>Activo</label>
       <label>Imagen PNG, JPG o WebP · hasta 4 MB<input id="bannerFile" type="file" accept="image/png,image/jpeg,image/webp"></label>
-      <p class="banner-help">Inicio: proporción vertical 2:3. Slots: horizontal 3,6:1. La imagen se adapta al marco; evitá texto cerca de los bordes. Los títulos no se superponen a las imágenes subidas.</p>
+      <p class="banner-help">Inicio: proporción vertical 2:3. Slots: horizontal 3,6:1. La imagen se adapta al marco; evitá texto cerca de los bordes. En Selección y Deportes, título y subtítulo se muestran sobre la imagen. En Selección, usá | para separar líneas. Los banners principales subidos se muestran sin texto superpuesto.</p>
       <img id="bannerPreview" class="banner-preview hidden" alt="Vista previa del banner">
       <div class="banner-form-actions"><button id="saveBanner" type="submit">Guardar banner</button><button id="cancelEdit" type="button">Cancelar edición</button></div>
       <p id="bannerMessage" role="status"></p>

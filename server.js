@@ -45,6 +45,19 @@ if (!db.bannerSeeded) {
     { id: crypto.randomUUID(), destination: 'slots', title: 'UNIVERSE GAME', subtitle: 'Tu universo de entretenimiento', image: '/assets/galaxy.webp', layout: 'brand', active: true, order: 0 }
   ); db.bannerSeeded = true;
 }
+// Import the existing promotional artwork once into managed uploads.
+if (!db.promoSeeded) {
+  for (const [destination, source, title, subtitle, order] of [
+    ['selection', 'roulette.webp', 'PREMIUM|LIVE ROULETTE', 'Una nueva experiencia en tu universo', 0],
+    ['selection', 'cards.webp', 'BLACKJACK Y|BACCARAT', 'Toda la emoción de las mesas', 1],
+    ['sports', 'sports.webp', 'LAS MEJORES LIGAS', 'PRÓXIMAMENTE', 0]
+  ]) {
+    const name = crypto.randomUUID() + '.webp';
+    fs.copyFileSync(path.join(root, 'public/assets', source), path.join(uploads, name));
+    db.banners.push({ id: crypto.randomUUID(), destination, title, subtitle, order, image: '/uploads/' + name, active: true, layout: 'promo' });
+  }
+  db.promoSeeded = true;
+}
 save();
 const sessions = new Map(), attempts = new Map();
 const dummyHash = hashPassword(crypto.randomBytes(20).toString('hex'));
@@ -113,6 +126,7 @@ const server = http.createServer(async (req, res) => {
         return json(res, 401, { error: 'Usuario o contraseña incorrectos.' });
       }
       attempts.delete(ip); if (auth) sessions.delete(auth.key);
+      found.loginHistory = [...(found.loginHistory || []), new Date().toISOString()].slice(-50); save();
       const token = crypto.randomBytes(32).toString('hex');
       sessions.set(tokenHash(token), { userId: found.id, expires: Date.now() + 28800000 });
       res.setHeader('Set-Cookie', cookie(req, token, 28800));
@@ -123,9 +137,18 @@ const server = http.createServer(async (req, res) => {
       res.setHeader('Set-Cookie', cookie(req, '', 0)); return json(res, 200, { ok: true });
     }
     if (route.startsWith('/api/')) {
+      if (route === '/api/banners' && req.method === 'GET') return json(res, 200, { banners: db.banners.filter(b => b.active && b.destination === url.searchParams.get('destination')).sort((a, b) => a.order - b.order) });
       if (!user) return json(res, 401, { error: 'Iniciá sesión para continuar.' });
       if (route === '/api/me' && req.method === 'GET') return json(res, 200, { user: publicUser(user) });
-      if (route === '/api/banners' && req.method === 'GET') return json(res, 200, { banners: db.banners.filter(b => b.active && b.destination === url.searchParams.get('destination')).sort((a, b) => a.order - b.order) });
+      if (route === '/api/account/logins' && req.method === 'GET') return json(res, 200, { entries: [...(user.loginHistory || [])].reverse() });
+      if (route === '/api/account/password' && req.method === 'POST') {
+        const input = await body(req);
+        if (typeof input.currentPassword !== 'string' || input.currentPassword.length > 256 || typeof input.password !== 'string' || input.password.length < 8 || input.password.length > 128) return json(res, 400, { error: 'La nueva contraseña debe tener entre 8 y 128 caracteres.' });
+        if (!verify(input.currentPassword, user.passwordHash)) return json(res, 400, { error: 'La contraseña actual no es correcta.' });
+        user.passwordHash = hashPassword(input.password); save();
+        for (const [key, value] of sessions) if (value.userId === user.id && key !== auth.key) sessions.delete(key);
+        return json(res, 200, { ok: true });
+      }
       if (route === '/api/panel/users') {
         if (!['admin', 'agent'].includes(user.role)) return json(res, 403, { error: 'Acceso no autorizado.' });
         if (req.method === 'GET') return json(res, 200, { users: db.users.filter(u => u.role !== 'admin' && (user.role === 'admin' || u.parentId === user.id)).map(u => ({ ...publicUser(u), hidden: !!u.hidden, parentId: u.parentId || null })) });
@@ -151,7 +174,7 @@ const server = http.createServer(async (req, res) => {
         if (route === '/api/admin/banners' && req.method === 'POST' || /^\/api\/admin\/banners\/[^/]+$/.test(route) && req.method === 'PUT') {
           if (req.method === 'PUT' && !existing) return json(res, 404, { error: 'Banner no encontrado.' });
           const input = await body(req);
-          if (!['home', 'slots'].includes(input.destination) || typeof input.title !== 'string' || !input.title.trim() || input.title.length > 120 || !Number.isInteger(input.order) || input.order < 0 || input.order > 9999 || typeof input.active !== 'boolean' || (input.subtitle !== undefined && (typeof input.subtitle !== 'string' || input.subtitle.length > 160))) return json(res, 400, { error: 'Revisá destino, título y orden del banner.' });
+          if (!['home', 'slots', 'selection', 'sports'].includes(input.destination) || typeof input.title !== 'string' || !input.title.trim() || input.title.length > 120 || !Number.isInteger(input.order) || input.order < 0 || input.order > 9999 || typeof input.active !== 'boolean' || (input.subtitle !== undefined && (typeof input.subtitle !== 'string' || input.subtitle.length > 160))) return json(res, 400, { error: 'Revisá destino, título y orden del banner.' });
           if (!existing && db.banners.length >= 60) return json(res, 400, { error: 'Máximo 60 banners.' });
           let image = existing?.image;
           try { if (input.imageData) image = imageUpload(input.imageData); else if (!existing) throw new Error('Seleccioná una imagen.'); } catch (e) { return json(res, 400, { error: e.message }); }
@@ -174,12 +197,11 @@ const server = http.createServer(async (req, res) => {
       return file(res, path.join(root, 'admin.html'));
     }
     if (/^\/jugadores(?:\/(slots|casino|deportes|caballos|crazzy))?\/?$/.test(route)) {
-      if (!user) return redirect(res, '/');
-      if (user.role !== 'player') return redirect(res, '/admin');
+      if (user && user.role !== 'player') return redirect(res, '/admin');
       return file(res, path.join(root, 'players.html'));
     }
     if (route.startsWith('/uploads/')) {
-      if (!user) return json(res, 401, { error: 'Iniciá sesión.' });
+      if (!user && !db.banners.some(b => b.active && b.image === route)) return json(res, 401, { error: 'Iniciá sesión.' });
       if (!/^\/uploads\/[a-f0-9-]+\.(png|jpg|webp)$/.test(route)) return json(res, 404, { error: 'No encontrado.' });
       return file(res, path.join(uploads, path.basename(route)));
     }
