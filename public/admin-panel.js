@@ -72,13 +72,43 @@ function showReport(player = false) {
   function range(){const start=new Date(),end=new Date();start.setHours(0,0,0,0);end.setHours(0,0,0,0);end.setDate(end.getDate()+1);if(period.value==='Ayer'){start.setDate(start.getDate()-1);end.setDate(end.getDate()-1);}if(period.value==='Este mes')start.setDate(1);const local=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;f.elements.start.value=local(start);f.elements.end.value=local(end);}period.addEventListener('change',()=>{if(period.value!=='Personalizado')range();});range();
   if(player)f.append(field('Nombre de usuario','username'));const submit=el('button','panel-button','BUSCAR');f.append(submit);const result=el('div');result.innerHTML=`<table class="user-table"><thead><tr><th>Categoría</th><th>Netwin</th><th>${player?'Rake':'Comisión'}</th></tr></thead></table>`;const status=empty('Ningún dato disponible en esta tabla');status.setAttribute('role','status');result.append(status);f.addEventListener('submit',e=>{e.preventDefault();status.textContent=new Date(f.elements.start.value+'T'+f.elements.startTime.value)>=new Date(f.elements.end.value+'T'+f.elements.endTime.value)?'La fecha final debe ser posterior a la inicial.':'Sin actividad de juegos registrada en el período seleccionado.';});card.append(f,result);screen.append(card);
 }
+function baseScreen(title) {
+  show('base'); screen.replaceChildren(el('h1','',title)); const card=el('section','panel-card'); screen.append(card); return card;
+}
+function soon(title) { baseScreen(title).append(empty('Pronto')); }
+function settings() {
+  const card=baseScreen('Settings');
+  card.append(el('h2','','Identidad de tu casino'),el('p','settings-note','Vista de muestra. Los cambios todavía no se guardan ni se aplican a la plataforma.'));
+  const name=field('Nombre del casino','casinoName');name.querySelector('input').placeholder='Tu casino aquí';
+  const logo=field('URL del logo','casinoLogo','url');logo.querySelector('input').placeholder='https://ejemplo.com/mi-logo.png';
+  const layout=el('label','panel-field','Interfaz principal'),select=el('select');select.name='casinoInterface';select.append(el('option','','Interfaz clásica'));layout.append(select);
+  const form=el('form','settings-form');form.addEventListener('submit',e=>e.preventDefault());form.append(name,logo,layout);
+  const save=button('Guardar · próximamente',()=>{});save.disabled=true;form.append(save);card.append(form);
+}
+function reportBase(title, columns, message) {
+  const card=baseScreen(title),form=el('form','report-form'),dates=el('div','report-dates');
+  dates.append(field('Fecha inicial','start','date'),field('Fecha final','end','date'));form.append(dates,field('Nombre de usuario','username'));
+  const submit=el('button','panel-button','BUSCAR');form.append(submit);const status=empty(message);status.setAttribute('role','status');
+  form.addEventListener('submit',e=>{e.preventDefault();const start=form.elements.start.value,end=form.elements.end.value;status.textContent=start&&end&&start>end?'Revisá el período: la fecha final debe ser posterior a la inicial.':message;});
+  const table=el('table','user-table'),head=el('thead'),row=el('tr');columns.forEach(c=>row.append(el('th','',c)));head.append(row);table.append(head);card.append(form,table,status);
+}
+function summary() {
+  const card=baseScreen('Mi resumen');card.append(el('h2','',currentUser?.username||'Mi cuenta'),el('p','',`Saldo disponible: ${money(currentUser?.balance||0)} fichas`),empty('Sin movimientos registrados.'));
+}
 for(const item of document.querySelectorAll('.menu-item')) {
   const label=item.querySelector('span')?.textContent;
   let action;
   if(label==='Estadísticas')action=()=>show('dashboard');
   if(label==='Usuarios')action=showUsers;
   if(label==='Reportes Globales') { const sub=el('div','report-submenu');sub.hidden=true;sub.append(button('Reporte por Agente',()=>showReport()),button('Reporte por Jugador',()=>showReport(true)));item.after(sub);item.setAttribute('aria-expanded','false');action=()=>{sub.hidden=!sub.hidden;item.setAttribute('aria-expanded',String(!sub.hidden));}; }
-  if(action){item.tabIndex=0;item.setAttribute('role','button');item.addEventListener('click',action);item.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();action();}});}
+  if(label==='Settings')action=settings;
+  if(['Soporte','Chat Soporte','Registro de actividad'].includes(label))action=()=>soon(label);
+  if(label==='Reportes de Fichas')action=()=>reportBase(label,['Fecha','Usuario','Movimiento','Fichas'],'Sin movimientos de fichas registrados.');
+  if(label==='Reportes de Juegos')action=()=>reportBase(label,['Fecha','Usuario','Juego','Resultado'],'Sin actividad de juegos registrada.');
+  if(label==='Finanzas')action=()=>reportBase(label,['Fecha','Concepto','Importe'],'Sin operaciones financieras registradas.');
+  if(label==='Mi resumen')action=summary;
+  if(label==='Categorías')action=()=>{const card=baseScreen(label);card.append(el('h2','','Catálogo de juegos'),empty('No hay categorías ni proveedores configurados.'));};
+  if(action){item.tabIndex=0;item.setAttribute('role','button');const activate=()=>{document.querySelectorAll('.menu-item').forEach(i=>i.classList.toggle('active',i===item));action();};item.addEventListener('click',activate);item.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();activate();}});}
 }
 // No real gaming activity is available until providers are configured.
 for(const card of dashboard.querySelectorAll('.dashboard-card:not(.quick-card)')) { const title=card.querySelector('.blue-title');card.replaceChildren(title,empty('Sin actividad registrada')); }
