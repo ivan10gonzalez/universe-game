@@ -51,6 +51,12 @@ test('Autenticación, autorización, banners y persistencia real', async t => {
       assert.equal((await request('/api/admin/banners', 'POST', {}, player.cookie)).status, 403);
       assert.equal('passwordHash' in player.data.user, false);
     });
+    await t.test('el administrador ve las dos cuentas iniciales en Usuarios', async () => {
+      const list=(await request('/api/panel/users','GET',undefined,admin.cookie)).data.users;
+      assert.ok(list.some(u=>u.username==='universe_admin' && u.role==='admin'));
+      assert.ok(list.some(u=>u.username==='universe_player' && u.role==='player'));
+      assert.ok(list.every(u=>!('passwordHash' in u)));
+    });
     let home, slots;
     await t.test('sube banners separados por destino, los ordena y sirve la imagen', async () => {
       home = (await request('/api/admin/banners', 'POST', { destination: 'home', title: 'Inicio de prueba', order: 5, active: true, imageData }, admin.cookie)).data.banner;
@@ -86,6 +92,17 @@ test('Autenticación, autorización, banners y persistencia real', async t => {
       assert.equal((await login('player')).status,401);
       await request('/api/account/password','POST',{currentPassword:'NuevaClave123!',password:'UniversePlayer2026!'},player.cookie);
     });
+    await t.test('carga y retiro: importes, permisos y reintentos sin duplicados', async () => {
+      const id=player.data.user.id,route='/api/panel/users/'+id+'/balance';
+      const input={operation:'credit',amount:'25,50',requestId:crypto.randomUUID()};
+      assert.equal((await request(route,'POST',input,player.cookie)).status,403);
+      const loaded=await request(route,'POST',input,admin.cookie);assert.equal(loaded.data.user.balance,10025.5);
+      assert.equal((await request(route,'POST',input,admin.cookie)).data.user.balance,10025.5);
+      assert.equal((await request(route,'POST',{...input,amount:'26'},admin.cookie)).status,409);
+      assert.equal((await request(route,'POST',{...input,amount:'0',requestId:crypto.randomUUID()},admin.cookie)).status,400);
+      assert.equal((await request(route,'POST',{...input,operation:'debit',amount:'99999',requestId:crypto.randomUUID()},admin.cookie)).status,400);
+      assert.equal((await request(route,'POST',{...input,operation:'debit',amount:'10.25',requestId:crypto.randomUUID()},admin.cookie)).data.user.balance,10015.25);
+    });
     await t.test('logout invalida la sesión en el servidor', async () => {
       await request('/api/logout', 'POST', {}, player.cookie);
       assert.equal((await request('/api/me', 'GET', undefined, player.cookie)).status, 401);
@@ -113,7 +130,17 @@ test('Autenticación, autorización, banners y persistencia real', async t => {
       assert.equal((await request('/api/panel/users','POST',{...input,username:'otro_agente',role:'agent'},session.cookie)).status,403);
       assert.equal((await request('/api/panel/users','POST',{...input,username:'hijo_agente'},session.cookie)).status,201);
       const scoped=(await request('/api/panel/users','GET',undefined,session.cookie)).data.users;assert.equal(scoped.length,1);assert.equal(scoped[0].username,'hijo_agente');assert.equal('passwordHash' in scoped[0],false);
+      const childRoute='/api/panel/users/'+scoped[0].id+'/balance';
+      const transfer={operation:'credit',amount:'5',requestId:crypto.randomUUID()};
+      assert.equal((await request(childRoute,'POST',transfer,session.cookie)).status,400);
+      assert.equal((await request('/api/panel/users/'+created.data.user.id+'/balance','POST',transfer,session.cookie)).status,403);
+      assert.equal((await request('/api/panel/users/'+agent.data.user.id+'/balance','POST',{...transfer,amount:'20',requestId:crypto.randomUUID()},admin.cookie)).status,200);
+      assert.equal((await request(childRoute,'POST',transfer,session.cookie)).data.user.balance,5);
+      assert.equal((await request('/api/me','GET',undefined,session.cookie)).data.user.balance,15);
+      assert.equal((await request(childRoute,'POST',{operation:'debit',amount:'2',requestId:crypto.randomUUID()},session.cookie)).data.user.balance,3);
+      assert.equal((await request('/api/me','GET',undefined,session.cookie)).data.user.balance,17);
       await stop();await start();
+      const persisted=JSON.parse(fs.readFileSync(dbPath));assert.equal(persisted.users.find(u=>u.id===scoped[0].id).balance,3);assert.ok(persisted.balanceMovements.length>=5);
       assert.equal((await login('player',input.password,input.username)).status,200);
       const stored=JSON.parse(fs.readFileSync(dbPath)).users.find(u=>u.username===input.username);assert.equal(stored.profile.fullName,input.fullName);assert.deepEqual(stored.permissions,[]);assert.equal(stored.balance,0);
     });

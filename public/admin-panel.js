@@ -58,13 +58,32 @@ function renderUsers() {
   const filters = el('div','list-tabs'); for (const [key,label] of [['all','TODOS'],['agent','AGENTES'],['player','JUGADORES'],['hidden','OCULTOS']]) filters.append(button(label, () => { filter=key;page=1;renderUsers(); }, filter === key ? 'selected' : '')); card.append(filters);
   const selected = users.filter(u => u.username.toLowerCase().includes(query.toLowerCase()) && (filter === 'hidden' ? u.hidden : !u.hidden && (filter === 'all' || u.role === filter)));
   const pages = Math.max(1, Math.ceil(selected.length/pageSize)); page = Math.min(page,pages);
-  const table = el('table','user-table'); table.innerHTML = '<thead><tr><th>Nombre de usuario</th><th>Fichas</th><th>Tipo</th></tr></thead>'; const body = el('tbody');
-  selected.slice((page-1)*pageSize,page*pageSize).forEach(u => { const row = el('tr'); row.append(el('td','username',u.username),el('td','',money(u.balance)),el('td','',u.role === 'agent' ? 'Agente' : 'Jugador')); body.append(row); });
+  const table = el('table','user-table'); table.innerHTML = '<thead><tr><th>Nombre de usuario</th><th>Fichas</th><th>Acciones</th></tr></thead>'; const body = el('tbody');
+  selected.slice((page-1)*pageSize,page*pageSize).forEach(u => {
+    const row = el('tr'), name=el('td','username',u.username), roleLabel=el('small','user-role',u.role==='admin'?'Administrador':u.role==='agent'?'Agente':'Jugador');name.append(roleLabel);
+    const actions=el('td','balance-actions');
+    if(u.role!=='admin')for(const [operation,label,symbol] of [['credit','Cargar fichas','+'],['debit','Retirar fichas','−']]){const b=button(symbol,()=>openBalance(u,operation),'balance-action');b.ariaLabel=`${label} a ${u.username}`;b.title=label;actions.append(b);}
+    else actions.append(el('span','', '—'));
+    row.append(name,el('td','',money(u.balance)),actions);body.append(row);
+  });
   if (!selected.length) { const row=el('tr'),cell=el('td','panel-empty','Ningún dato disponible en esta tabla');cell.colSpan=3;row.append(cell);body.append(row); } table.append(body);card.append(table);
   const pagination = el('div','pagination'); const previous=button('‹',()=>{page--;renderUsers();}),next=button('›',()=>{page++;renderUsers();});previous.disabled=page===1;next.disabled=page===pages; previous.ariaLabel='Página anterior'; next.ariaLabel='Página siguiente';pagination.append(previous,el('span','',`${page} / ${pages}`),next);
   const size = el('label','','Mostrar registros '),select=el('select');for(const n of [10,25,50]){const option=el('option','',String(n));option.value=n;select.append(option);}select.value=pageSize;select.addEventListener('change',()=>{pageSize=Number(select.value);page=1;renderUsers();});size.append(select);pagination.append(size);card.append(pagination);screen.append(card);
 }
-function showStructure() { show('structure'); screen.replaceChildren(el('h1','','Estructura de usuarios')); const card=el('section','panel-card');card.append(el('h2','',currentUser.username)); for(const u of users)card.append(el('p','',`${u.role==='agent'?'Agente':'Jugador'} · ${u.username}`));card.append(button('VOLVER',renderUsers));screen.append(card); }
+const balanceDialog=el('dialog','balance-dialog');document.body.append(balanceDialog);
+let balanceBusy=false;
+balanceDialog.addEventListener('cancel',e=>{if(balanceBusy)e.preventDefault();});
+function openBalance(account,operation) {
+  const requestId=crypto.randomUUID();balanceDialog.replaceChildren();
+  const title=operation==='credit'?'Cargar fichas':'Retirar fichas';balanceDialog.append(el('h2','',title),el('p','',account.username),el('p','',`Saldo actual: ${money(account.balance)} fichas`));
+  const f=el('form','balance-form'),amount=field('Importe en fichas','amount');const input=amount.querySelector('input');input.inputMode='decimal';input.placeholder='0,00';input.required=true;input.maxLength=12;
+  const status=el('p','form-feedback');status.setAttribute('role','status');const actions=el('div','panel-actions');const cancel=button('CANCELAR',()=>balanceDialog.close(),'panel-button outline'),submit=el('button','panel-button','CONFIRMAR');actions.append(cancel,submit);f.append(amount,status,actions);balanceDialog.append(f);
+  f.addEventListener('submit',async e=>{e.preventDefault();if(balanceBusy)return;const value=input.value.trim();if(!/^\d{1,9}(?:[.,]\d{1,2})?$/.test(value)||Number(value.replace(',','.'))<=0){status.textContent='Ingresá un importe mayor a cero, con hasta dos decimales.';return;}balanceBusy=true;submit.disabled=cancel.disabled=true;input.disabled=true;submit.textContent='GUARDANDO…';status.textContent='';
+    try{const result=await api('/api/panel/users/'+account.id+'/balance',{method:'POST',body:JSON.stringify({operation,amount:value,requestId})});if(result.actor){currentUser=result.actor;$('#adminBalance').textContent=money(currentUser.balance);}balanceDialog.close();await showUsers();screen.prepend(el('p','panel-notice',`${title}: ${money(Number(value.replace(',','.')))} · ${account.username}. Saldo: ${money(result.user.balance)} fichas.`));}
+    catch(error){status.textContent=error.message;}finally{balanceBusy=false;submit.disabled=cancel.disabled=false;input.disabled=false;submit.textContent='CONFIRMAR';}
+  });balanceDialog.showModal();input.focus();
+}
+function showStructure() { show('structure'); screen.replaceChildren(el('h1','','Estructura de usuarios')); const card=el('section','panel-card');card.append(el('h2','',currentUser.username)); for(const u of users)card.append(el('p','',`${u.role==='admin'?'Administrador':u.role==='agent'?'Agente':'Jugador'} · ${u.username}`));card.append(button('VOLVER',renderUsers));screen.append(card); }
 function showReport(player = false) {
   show('reports');screen.replaceChildren(el('h1','',player?'Reporte Global por Jugador':'Reporte Global'));
   const card=el('section','panel-card'),f=el('form','report-form'),period=el('select');period.ariaLabel='Período';for(const t of ['Hoy','Ayer','Este mes','Personalizado'])period.append(el('option','',t));f.append(period);
@@ -113,7 +132,7 @@ for(const item of document.querySelectorAll('.menu-item')) {
 // No real gaming activity is available until providers are configured.
 for(const card of dashboard.querySelectorAll('.dashboard-card:not(.quick-card)')) { const title=card.querySelector('.blue-title');card.replaceChildren(title,empty('Sin actividad registrada')); }
 const fake=$('.fake-input');const quickInput=el('input','quick-username');quickInput.placeholder='Nombre de usuario';quickInput.ariaLabel='Nombre de usuario';fake.replaceWith(quickInput);
-for(const b of document.querySelectorAll('.quick-input-row .round-btn')) {b.disabled=true;b.title='Carga y retiro pendientes de configurar';b.setAttribute('aria-label',b.textContent==='+'?'Cargar fichas: pendiente':'Retirar fichas: pendiente');}
+for(const b of document.querySelectorAll('.quick-input-row .round-btn')) {b.title=b.textContent==='+'?'Cargar fichas':'Retirar fichas';b.setAttribute('aria-label',b.title);b.addEventListener('click',async()=>{try{const result=await api('/api/panel/users');const account=result.users.find(u=>u.username.toLowerCase()===quickInput.value.trim().toLowerCase()&&u.role!=='admin');if(account)openBalance(account,b.textContent==='+'?'credit':'debit');else{query=quickInput.value;await showUsers();screen.prepend(el('p','panel-notice','Buscá el usuario y elegí + para cargar o − para retirar fichas.'));}}catch(error){show('users');screen.replaceChildren(empty(error.message));}});}
 try { ({user:currentUser}=await api('/api/me')); if(currentUser.role==='agent'){quick[1].hidden=true;dialog.querySelector('[data-role="agent"]').hidden=true;} }catch(e){screen.append(empty(e.message));}
 
 const accountButton = button('▾', () => { accountMenu.hidden = !accountMenu.hidden; accountButton.setAttribute('aria-expanded', String(!accountMenu.hidden)); }, 'account-toggle');

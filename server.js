@@ -13,6 +13,7 @@ fs.mkdirSync(uploads, { recursive: true, mode: 0o700 });
 const db = fs.existsSync(dbPath) ? JSON.parse(fs.readFileSync(dbPath, 'utf8')) : { users: [], banners: [], demoAccounts: {} };
 if (!Array.isArray(db.users) || !Array.isArray(db.banners)) throw new Error('Base inválida. Se conserva el archivo; restaure una copia válida.');
 db.demoAccounts ||= {};
+db.balanceMovements ||= [];
 function save() {
   const temp = dbPath + '.tmp';
   const fd = fs.openSync(temp, 'w', 0o600);
@@ -149,9 +150,36 @@ const server = http.createServer(async (req, res) => {
         for (const [key, value] of sessions) if (value.userId === user.id && key !== auth.key) sessions.delete(key);
         return json(res, 200, { ok: true });
       }
+      const balanceRoute = /^\/api\/panel\/users\/([^/]+)\/balance$/.exec(route);
+      if (balanceRoute && req.method === 'POST') {
+        if (!['admin', 'agent'].includes(user.role)) return json(res, 403, { error: 'Acceso no autorizado.' });
+        const target = db.users.find(u => u.id === balanceRoute[1]);
+        if (!target || target.role === 'admin' || (user.role === 'agent' && (target.role !== 'player' || target.parentId !== user.id))) return json(res, 403, { error: 'No podés modificar esta cuenta.' });
+        const input = await body(req);
+        if (!['credit', 'debit'].includes(input.operation) || typeof input.amount !== 'string' || !/^\d{1,9}(?:[.,]\d{1,2})?$/.test(input.amount) || typeof input.requestId !== 'string' || !/^[a-zA-Z0-9-]{16,80}$/.test(input.requestId)) return json(res, 400, { error: 'Ingresá un importe válido, con hasta dos decimales.' });
+        const amount = Math.round(Number(input.amount.replace(',', '.')) * 100);
+        if (amount <= 0) return json(res, 400, { error: 'El importe debe ser mayor a cero.' });
+        const prior = db.balanceMovements.find(m => m.actorId === user.id && m.requestId === input.requestId);
+        if (prior) {
+          if (prior.userId !== target.id || prior.amount !== amount || prior.operation !== input.operation) return json(res, 409, { error: 'La solicitud ya fue utilizada para otro movimiento.' });
+          return json(res, 200, { user: publicUser(target), duplicate: true });
+        }
+        const current = Math.round(target.balance * 100), actorBalance = Math.round(user.balance * 100);
+        if (input.operation === 'debit' && current < amount) return json(res, 400, { error: 'El usuario no tiene suficientes fichas.' });
+        if (user.role === 'agent' && input.operation === 'credit' && actorBalance < amount) return json(res, 400, { error: 'No tenés suficientes fichas para esta carga.' });
+        const next = current + (input.operation === 'credit' ? amount : -amount);
+        const actorNext = actorBalance + (input.operation === 'credit' ? -amount : amount);
+        if (!Number.isSafeInteger(next) || (user.role === 'agent' && !Number.isSafeInteger(actorNext))) return json(res, 400, { error: 'El saldo supera el límite permitido.' });
+        const oldTarget = target.balance, oldActor = user.balance;
+        target.balance = next / 100;
+        if (user.role === 'agent') user.balance = actorNext / 100;
+        db.balanceMovements.push({ id: crypto.randomUUID(), requestId: input.requestId, actorId: user.id, userId: target.id, operation: input.operation, amount, balance: next, createdAt: new Date().toISOString() });
+        try { save(); } catch(e) { target.balance=oldTarget; user.balance=oldActor; db.balanceMovements.pop(); throw e; }
+        return json(res, 200, { user: publicUser(target), actor: publicUser(user) });
+      }
       if (route === '/api/panel/users') {
         if (!['admin', 'agent'].includes(user.role)) return json(res, 403, { error: 'Acceso no autorizado.' });
-        if (req.method === 'GET') return json(res, 200, { users: db.users.filter(u => u.role !== 'admin' && (user.role === 'admin' || u.parentId === user.id)).map(u => ({ ...publicUser(u), hidden: !!u.hidden, parentId: u.parentId || null })) });
+        if (req.method === 'GET') return json(res, 200, { users: db.users.filter(u => user.role === 'admin' || (u.role === 'player' && u.parentId === user.id)).map(u => ({ ...publicUser(u), hidden: !!u.hidden, parentId: u.parentId || null })) });
         if (req.method === 'POST') {
           const input = await body(req);
           if (!['player', 'agent'].includes(input.role) || (user.role === 'agent' && input.role !== 'player')) return json(res, 403, { error: 'No podés crear este tipo de cuenta.' });
