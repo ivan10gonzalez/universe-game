@@ -97,7 +97,7 @@ function cleanUnusedUpload(image) {
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.woff2': 'font/woff2' };
 function file(res, filename, cache = false) {
   if (!fs.existsSync(filename) || !fs.statSync(filename).isFile()) return json(res, 404, { error: 'No encontrado.' });
-  res.writeHead(200, { 'Content-Type': types[path.extname(filename)] || 'application/octet-stream', 'Cache-Control': cache ? 'public, max-age=3600' : 'no-store' });
+  res.writeHead(200, { 'Content-Type': types[path.extname(filename)] || 'application/octet-stream', 'Cache-Control': cache && !['.js', '.css'].includes(path.extname(filename)) ? 'public, max-age=3600' : 'no-store' });
   fs.createReadStream(filename).pipe(res);
 }
 const server = http.createServer(async (req, res) => {

@@ -43,7 +43,7 @@ const profileActions = [
   ['Cerrar sesión',logout]
 ];
 document.querySelectorAll('[data-dialog]').forEach(button => { button.setAttribute('aria-expanded','false'); button.addEventListener('click',()=>{
-  const type=button.dataset.dialog;if(type==='chat'){support();return;}if(activePopup===type){closePopup();return;}closePopup();activePopup=type;popup.replaceChildren();popup.classList.toggle('notification-dropdown',type==='notifications');
+  const type=button.dataset.dialog;if(!user && type !== 'chat'){loginDialog();return;}if(type==='chat'){support();return;}if(activePopup===type){closePopup();return;}closePopup();activePopup=type;popup.replaceChildren();popup.classList.toggle('notification-dropdown',type==='notifications');
   const items=type==='profile'?profileActions:[['· Mesa de ayuda ·',support],['· Notificaciones ·',()=>messageDialog('Notificaciones','No tenés notificaciones.')]];
   for(const [label,callback] of items)popup.append(action(label,callback));popup.hidden=false;button.setAttribute('aria-expanded','true');
 }); });
@@ -108,7 +108,7 @@ try {
   const response = await fetch('/api/me', { credentials: 'same-origin' });
   if (response.ok) { ({user} = await response.json()); if(user.role !== 'player') { location.replace('/admin'); } document.querySelector('#balance').textContent = formatBalance(user.balance); }
   else if(response.status !== 401) throw new Error('No se pudo consultar la sesión.');
-  document.querySelector('.account-bar').hidden = !user; document.querySelector('#openPlayerLogin').hidden = !!user; document.querySelector('#drawerLogout').hidden = !user;
+  document.querySelector('#balance').hidden = !user; document.querySelector('#refreshBalance').hidden = !user; document.querySelector('#openPlayerLogin').hidden = !!user; document.querySelector('#drawerLogout').hidden = !user;
   if (page === 'home') { const results = await Promise.all(['home', 'selection', 'sports'].map(destination => api('/api/banners?destination=' + destination))); home(...results.map(result => result.banners)); }
   else if (page === 'slots' || page === 'casino') catalog(page === 'slots' ? (await api('/api/banners?destination=slots')).banners : []);
   else { const blank = el('section', 'blank-view'); blank.setAttribute('aria-label', names[page]); blank.append(el('h1', 'blank-heading', names[page])); const back = el('a', '', '← Volver al inicio'); back.href = '/jugadores'; blank.append(back); content.append(blank); }
