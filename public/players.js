@@ -85,24 +85,61 @@ function footer() {
 function promo(image, title, description) {
   const link = el('a', 'promo'); link.href = '/jugadores/casino'; const img = el('img'); img.src = image; img.alt = ''; img.loading = 'lazy'; const copy = el('div', 'promo-copy'); const heading = el('h3'); title.split('|').forEach((line, index) => { if (index) heading.append(el('br')); heading.append(document.createTextNode(line)); }); copy.append(heading, el('p', '', description)); link.append(img, copy); return link;
 }
+const demoGames = [{ id: 'joker', title: 'Joker’s Jewels', href: '/games/joker/index.html', image: '/games/joker/assets/reference-frame.jpg' }];
+function gamePreferences() {
+  const key = 'universe-demo-games:' + (user?.id || 'guest');
+  let saved;
+  try { saved = JSON.parse(localStorage.getItem(key)); } catch { /* Storage can be unavailable in private browsing. */ }
+  const favorites = new Set(Array.isArray(saved?.favorites) ? saved.favorites : []);
+  const recent = new Set(Array.isArray(saved?.recent) ? saved.recent : []);
+  return { favorites, recent, save() { try { localStorage.setItem(key, JSON.stringify({ favorites: [...favorites], recent: [...recent] })); } catch { /* Navigation does not depend on storage. */ } } };
+}
+function gameCard(game, preferences, onFavorite = () => {}) {
+  const card = el('article', 'demo-game-card'), link = el('a', 'demo-game-link');
+  link.href = game.href; link.setAttribute('aria-label', 'Abrir ' + game.title + ' — demo con fichas de prueba');
+  const art = el('div', 'demo-game-art'), image = el('img'); image.src = game.image; image.alt = 'Rodillos violetas, joyas de colores y el Joker'; image.loading = 'lazy';
+  art.append(image, el('span', 'demo-game-badge', 'DEMO'));
+  const copy = el('div', 'demo-game-copy'); copy.append(el('h3', '', game.title), el('p', '', 'Fichas de prueba'), el('span', 'demo-game-play', 'JUGAR DEMO →'));
+  link.append(art, copy); link.addEventListener('click', () => { preferences.recent.add(game.id); preferences.save(); });
+  const favorite = action('♡', () => {
+    if (preferences.favorites.has(game.id)) preferences.favorites.delete(game.id); else preferences.favorites.add(game.id);
+    preferences.save(); updateFavorite(); onFavorite();
+  }, 'demo-game-favorite');
+  function updateFavorite() { const selected = preferences.favorites.has(game.id); favorite.textContent = selected ? '♥' : '♡'; favorite.setAttribute('aria-pressed', String(selected)); favorite.setAttribute('aria-label', (selected ? 'Quitar de favoritos: ' : 'Agregar a favoritos: ') + game.title); }
+  updateFavorite(); card.append(link, favorite); return card;
+}
 function home(banners, promotions, sportsBanners) {
   const hero = carousel(banners, 'hero'); if (hero) content.append(hero);
   const sections = el('div', 'home-sections'), selection = el('section', 'selection'), grid = el('div', 'promo-grid');
   selection.append(el('h2', '', 'NUESTRA SELECCIÓN PARA TI')); for (const banner of promotions) grid.append(promo(banner.image, banner.title, banner.subtitle)); selection.append(grid); sections.append(selection);
   const sports = el('section', 'sports-section'); sports.append(el('h2', '', 'APUESTAS DEPORTIVAS')); for (const banner of sportsBanners) { const link = el('a', 'sports-promo'); link.href = '/jugadores/deportes'; const img = el('img'); img.src = banner.image; img.alt = ''; img.loading = 'lazy'; const copy = el('div', 'sports-copy', banner.title); copy.append(el('b', '', banner.subtitle)); link.append(img, copy); sports.append(link); } sections.append(sports);
-  for (const [title, cls] of [['TRAGAMONEDAS', ''], ['MESAS EN VIVO SELECCIONADAS', 'live']]) { const section = el('section', 'empty-home-section ' + cls); section.append(el('h2', '', title), el('div', 'empty-space')); sections.append(section); }
+  for (const [title, cls] of [['TRAGAMONEDAS', ''], ['MESAS EN VIVO SELECCIONADAS', 'live']]) {
+    const section = el('section', 'empty-home-section ' + cls); section.append(el('h2', '', title));
+    if (!cls) { const games = el('div', 'demo-game-grid'), preferences = gamePreferences(); for (const game of demoGames) games.append(gameCard(game, preferences)); section.append(games); }
+    else section.append(el('div', 'empty-space'));
+    sections.append(section);
+  }
   content.append(sections, footer());
 }
 function catalog(banners) {
   const banner = carousel(banners, 'slots-banner'); if (banner) content.append(banner);
   const toolbar = el('div', 'catalog-toolbar'), favorites = el('button', '', '❤️ Favoritos'), recent = el('button', '', '⟳ Recientes'), form = el('form', 'catalog-search');
   const input = el('input'); input.type = 'search'; input.setAttribute('aria-label', 'Buscar juegos'); const search = el('button', '', '⌕'); search.setAttribute('aria-label', 'Buscar'); form.append(input, search); toolbar.append(favorites, recent, form);
-  const providers = el('div', 'provider-toolbar'), select = el('select'); select.setAttribute('aria-label', 'Proveedores'); select.disabled = true; const option = el('option', '', 'Sin proveedores'); select.append(option); providers.append(select, el('span', '', '0 juegos'));
-  const empty = el('div', 'catalog-empty'); empty.setAttribute('role', 'status'); empty.textContent = 'No hay juegos disponibles por el momento.';
+  const games = page === 'slots' ? demoGames : [], preferences = gamePreferences();
+  const providers = el('div', 'provider-toolbar'), select = el('select'); select.setAttribute('aria-label', 'Proveedores'); select.disabled = true; select.append(el('option', '', games.length ? 'Demos propias' : 'Sin proveedores'));
+  const count = el('span'); count.setAttribute('role', 'status'); providers.append(select, count);
+  const grid = el('div', 'demo-game-grid demo-catalog-grid'), empty = el('div', 'catalog-empty'); empty.setAttribute('role', 'status');
   let filter = '';
-  function renderEmpty() { empty.textContent = input.value.trim() ? 'No hay resultados: el catálogo está vacío.' : filter === 'favorites' ? 'Todavía no tenés juegos favoritos.' : filter === 'recent' ? 'Todavía no hay juegos recientes.' : 'No hay juegos disponibles por el momento.'; favorites.classList.toggle('selected', filter === 'favorites'); recent.classList.toggle('selected', filter === 'recent'); favorites.setAttribute('aria-pressed', String(filter === 'favorites')); recent.setAttribute('aria-pressed', String(filter === 'recent')); }
-  favorites.addEventListener('click', () => { filter = filter === 'favorites' ? '' : 'favorites'; renderEmpty(); }); recent.addEventListener('click', () => { filter = filter === 'recent' ? '' : 'recent'; renderEmpty(); }); form.addEventListener('submit', event => { event.preventDefault(); renderEmpty(); }); input.addEventListener('input', renderEmpty); renderEmpty();
-  content.append(toolbar, providers, empty);
+  function renderGames() {
+    const query = input.value.trim().toLocaleLowerCase('es');
+    const visible = games.filter(game => game.title.toLocaleLowerCase('es').includes(query) && (!filter || preferences[filter].has(game.id)));
+    grid.replaceChildren(...visible.map(game => gameCard(game, preferences, renderGames))); grid.hidden = !visible.length; empty.hidden = !!visible.length;
+    count.textContent = visible.length + (visible.length === 1 ? ' juego' : ' juegos');
+    empty.textContent = query ? 'No hay juegos que coincidan con tu búsqueda.' : filter === 'favorites' ? 'Todavía no tenés juegos favoritos.' : filter === 'recent' ? 'Todavía no hay juegos recientes.' : 'No hay juegos disponibles por el momento.';
+    favorites.classList.toggle('selected', filter === 'favorites'); recent.classList.toggle('selected', filter === 'recent'); favorites.setAttribute('aria-pressed', String(filter === 'favorites')); recent.setAttribute('aria-pressed', String(filter === 'recent'));
+  }
+  favorites.addEventListener('click', () => { filter = filter === 'favorites' ? '' : 'favorites'; renderGames(); }); recent.addEventListener('click', () => { filter = filter === 'recent' ? '' : 'recent'; renderGames(); }); form.addEventListener('submit', event => { event.preventDefault(); renderGames(); }); input.addEventListener('input', renderGames); renderGames();
+  content.append(toolbar, providers, grid, empty);
 }
 try {
   const response = await fetch('/api/me', { credentials: 'same-origin' });

@@ -1,6 +1,6 @@
 # Universe Game
 
-Plataforma de jugadores con fichas virtuales y panel Master Root conservado. No hay dinero real, juegos, apuestas, cuotas ni proveedores conectados.
+Plataforma de jugadores con fichas virtuales, una demo educativa de Joker y panel Master Root conservado. No hay dinero real, cuotas ni proveedores conectados.
 
 ## Arranque
 
@@ -64,3 +64,10 @@ La comprobación visual en navegador y las capturas no deben considerarse aproba
 ## Recursos gráficos
 
 Los gráficos galáctico, ruleta, cartas y deportes fueron generados para esta implementación y optimizados en WebP. El logotipo de texto, las tipografías Metropolis y los seis iconos genéricos de navegación se obtuvieron de los recursos públicos de `universegame.co`, la referencia indicada por el usuario. No se descargó ningún juego ni catálogo. El orbital combina un SVG de órbitas con el logotipo; el diseño es una reconstrucción, no una captura utilizada como página. El logotipo original del panel sigue conservado.
+
+
+## Demo de Joker en la plataforma
+
+Inicio → Tragamonedas y Slots incluyen una tarjeta de **Joker’s Jewels** que abre `/games/joker/index.html` en la misma pestaña. La demo tiene navegación para volver a Slots y audio opcional. Se puede probar sin iniciar sesión; sus fichas se reinician al cargar la demo y nunca modifican el saldo de la cuenta. Favoritos y Recientes se guardan en este navegador, separados por usuario.
+
+La copia estática procede de `ivan10gonzalez/Juegos-`; `public/games/joker/source.json` registra el commit incorporado. Para actualizarla después de modificar Juegos, ejecutar `node scripts/sync-joker.mjs /ruta/al/repositorio/Juegos- <commit>` y publicar también este repositorio. La sincronización entre ambos repositorios no es automática. El script conserva la barra de regreso definida en `platform.css`.
