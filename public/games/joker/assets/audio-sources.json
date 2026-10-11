@@ -1,0 +1,26 @@
+{
+  "source": "Videos de referencia aportados por el usuario el 2026-10-10; fragmentos, no pistas comerciales completas.",
+  "sampleAnalysisRate": 22050,
+  "tracks": {
+    "music-active.mp3": {
+      "video": "ScreenRecording_10-10-2026 22-53-58_1.MP4",
+      "startSeconds": 16,
+      "durationSeconds": 32.97709750566894,
+      "method": "Tramo sin nuevos giros ni cambios de apuesta. Periodo identificado por correlación (0.983). Bordes de 6 ms para evitar clics al repetir."
+    },
+    "music-calm.mp3": {
+      "video": "ScreenRecording_10-10-2026 22-48-59_1.MP4",
+      "startSeconds": 23,
+      "durationSeconds": 7.328253968253969,
+      "method": "Reposo después del primer giro. Periodo identificado por correlación (0.998). Bordes de 6 ms."
+    },
+    "bet-change.mp3": {
+      "video": "ScreenRecording_10-10-2026 22-52-05_1.MP4",
+      "startSeconds": 1.37,
+      "durationSeconds": 0.19,
+      "method": "Sustracción del fondo tranquilo alineado por fase (correlación 0.996, ganancia 1.00059); fade final de 20 ms. Se reproduce una sola vez por cambio efectivo."
+    }
+  },
+  "otherEffects": "Movimiento, parada de rodillos y premio recreados con Web Audio y disparados por eventos, sin formar parte del fondo.",
+  "behavior": "Silencio al entrar. Fondo activo al modificar la apuesta antes del primer giro o al girar. Fondo tranquilo 10 s después de finalizar un giro. El frenado manual conserva rodillos detenidos y resultado."
+}

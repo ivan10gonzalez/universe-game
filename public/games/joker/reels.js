@@ -25,17 +25,32 @@
  }
  function progress(t){t=Math.max(0,Math.min(1,t));const a=.045,b=.9,area=a/2+b-a+(1-b)/2;if(t<a)return t*t/(2*a*area);if(t<b)return (a/2+t-a)/area;const u=t-b;return (a/2+b-a+u-u*u/(2*(1-b)))/area;}
  function plan(before,result,fast,reduced){return result.map((end,c)=>{const steps=reduced?0:24+c*8,keys=Object.keys(art),sequence=Array.from({length:steps+6},(_,i)=>keys[(i*7+c*3+Math.floor(i/3))%keys.length]);before[c].forEach((k,r)=>sequence[steps+r]=k);end.forEach((k,r)=>sequence[r]=k);return {steps,sequence,duration:reduced?150:(fast?520:1120)+c*(fast?120:350)};});}
+ function endTime(spin){return spin.stop?spin.stop.at+spin.stop.duration:spin.duration;}
+ function sample(spin,elapsed){
+  const active=elapsed<endTime(spin);
+  if(!active)return {distance:spin.steps,active:false,smear:0};
+  if(spin.stop){const t=Math.max(0,Math.min(1,(elapsed-spin.stop.at)/spin.stop.duration));return {distance:spin.stop.from+(spin.steps-spin.stop.from)*(1-Math.pow(1-t,3)),active:true,smear:t<.72?40:t<.91?16:0};}
+  const t=Math.max(0,elapsed/spin.duration);return {distance:spin.steps*progress(t),active:true,smear:t<.035||t>.965?0:t>.925?20:60};
+ }
+ function requestStop(spins,elapsed){
+  let pending=0;
+  return spins.map(spin=>{
+   if(spin.stop||!sample(spin,elapsed).active)return spin;
+   const duration=Math.min(spin.duration-elapsed,150+pending++*18);
+   return {...spin,stop:{at:elapsed,from:sample(spin,elapsed).distance,duration}};
+  });
+ }
  function backdrop(ctx,image,c,moving){const [left,right]=columns[c],width=right-left;
   if(!background){background=surface(37,29);background.getContext('2d').drawImage(image,212,852,37,29,0,0,37,29);}
   ctx.fillStyle='#700891';ctx.fillRect(left,Y,width,H*3);
   ctx.save();ctx.globalAlpha=moving?.2:.9;ctx.fillStyle=ctx.createPattern(background,'repeat');ctx.fillRect(left,Y,width,H*3);ctx.restore();
   const shade=ctx.createLinearGradient(left,0,right,0);shade.addColorStop(0,'#22003199');shade.addColorStop(.18,'#22003100');shade.addColorStop(.8,'#22003100');shade.addColorStop(1,'#22003199');ctx.fillStyle=shade;ctx.fillRect(left,Y,width,H*3);
  }
- function draw(ctx,image,grid,spins,elapsed){for(let c=0;c<5;c++){const [left,right,cx]=columns[c],spin=spins?.[c],active=spin&&elapsed<spin.duration;
+ function draw(ctx,image,grid,spins,elapsed){for(let c=0;c<5;c++){const [left,right,cx]=columns[c],spin=spins?.[c],position=spin&&sample(spin,elapsed),active=position?.active;
    ctx.save();ctx.beginPath();ctx.rect(left,Y,right-left,H*3);ctx.clip();backdrop(ctx,image,c,active);
-   if(active){const t=elapsed/spin.duration,d=spin.steps*progress(t),smear=t<.035?0:t>.965?0:t>.925?20:60;for(let j=Math.floor(-d)-2;j<Math.ceil(3-d)+2;j++){const k=spin.sequence[j+spin.steps];if(k)drawSymbol(ctx,image,k,cx,Y+(j+d)*H,smear);}}
+   if(active){const d=position.distance,smear=position.smear;for(let j=Math.floor(-d)-2;j<Math.ceil(3-d)+2;j++){const k=spin.sequence[j+spin.steps];if(k)drawSymbol(ctx,image,k,cx,Y+(j+d)*H,smear);}}
    else grid[c].forEach((k,r)=>drawSymbol(ctx,image,k,cx,Y+r*H));
    const light=ctx.createLinearGradient(0,Y,0,Y+H*3);light.addColorStop(0,'#f2d1ec65');light.addColorStop(.1,'#fff0');light.addColorStop(.85,'#19002200');light.addColorStop(1,'#19002266');ctx.fillStyle=light;ctx.fillRect(left,Y,right-left,H*3);ctx.restore();
   }for(const [x,w] of [[178,21],[353,14],[526,15],[695,17]])ctx.drawImage(image,x,741,w,372,x,423,w,372);}
- const api={progress,plan,draw,initial,configure};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.ReelView=api;
+ const api={progress,plan,draw,initial,configure,sample,endTime,requestStop};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.ReelView=api;
 })(globalThis);

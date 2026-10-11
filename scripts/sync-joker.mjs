@@ -1,5 +1,5 @@
 // Run with a local checkout of Juegos- and its source commit. No credentials are copied.
-import { mkdir, readFile, writeFile, copyFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, copyFile, rm } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -9,9 +9,10 @@ if (!sourcePath || !/^[a-f0-9]{40}$/.test(sourceCommit || '')) {
 }
 const destination = resolve(dirname(fileURLToPath(import.meta.url)), '../public/games/joker');
 const source = resolve(sourcePath);
-const files = ['reference.css', 'reference.js', 'reels.js', 'engine.js',
-  ...['frame.jpg', 'symbols.jpg', 'spin.jpg', 'bet.jpg', 'auto.jpg', 'hyper.jpg', 'rules.jpg', 'audio.mp3'].map(name => 'assets/reference-' + name)];
+const files = ['reference.css', 'reference.js', 'reels.js', 'engine.js', 'audio.js', 'assets/audio-sources.json', 'assets/music-active.mp3', 'assets/music-calm.mp3', 'assets/bet-change.mp3',
+  ...['frame.jpg', 'symbols.jpg', 'spin.jpg', 'bet.jpg', 'auto.jpg', 'hyper.jpg', 'rules.jpg'].map(name => 'assets/reference-' + name)];
 await mkdir(resolve(destination, 'assets'), { recursive: true });
+await rm(resolve(destination, 'assets/reference-audio.mp3'), { force: true });
 for (const file of files) await copyFile(resolve(source, file), resolve(destination, file));
 const html = (await readFile(resolve(source, 'teatro-del-azar.html'), 'utf8'))
   .replace('</head>', '<link rel="stylesheet" href="platform.css"></head>')

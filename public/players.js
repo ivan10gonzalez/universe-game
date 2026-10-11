@@ -85,7 +85,7 @@ function footer() {
 function promo(image, title, description) {
   const link = el('a', 'promo'); link.href = '/jugadores/casino'; const img = el('img'); img.src = image; img.alt = ''; img.loading = 'lazy'; const copy = el('div', 'promo-copy'); const heading = el('h3'); title.split('|').forEach((line, index) => { if (index) heading.append(el('br')); heading.append(document.createTextNode(line)); }); copy.append(heading, el('p', '', description)); link.append(img, copy); return link;
 }
-const demoGames = [{ id: 'joker', title: 'Joker’s Jewels', href: '/games/joker/index.html', image: '/games/joker/assets/reference-frame.jpg' }];
+const demoGames = [{ id: 'joker', title: 'Joker’s Jewels', href: '/games/joker/index.html?v=20261010', image: '/games/joker/assets/reference-frame.jpg' }];
 function gamePreferences() {
   const key = 'universe-demo-games:' + (user?.id || 'guest');
   let saved;

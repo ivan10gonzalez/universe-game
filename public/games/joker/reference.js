@@ -6,9 +6,13 @@ const atlasSources={rules:'assets/reference-rules.jpg',symbols:'assets/reference
 const atlasImages=window.gameAssets||{};
 const atlasReady=window.gameAssets?Promise.resolve():Promise.all(Object.entries(atlasSources).map(([key,src])=>new Promise((resolve,reject)=>{const a=new Image();a.onload=()=>{atlasImages[key]=a;resolve();};a.onerror=reject;a.src=src;})));
 const FRAME={x:0,y:318,w:886,h:1414};
-let balance=533340,stake=250,rounds=[],grid=null,busy=false,ready=false,fast=false,animation=0,phase='idle',changed=false,muted=true;
+let balance=533340,stake=250,rounds=[],grid=null,busy=false,ready=false,fast=false,animation=0,phase='idle',changed=false;
 let statusPatch=null;
-let spinPlan=null,spinElapsed=0,finishRequested=false,lastPayout=0;
+let spinPlan=null,spinElapsed=0,spinStarted=0,lastPayout=0,hasPlayed=false,calmTimer=null;
+const sound=JokerAudio.create();
+function audioStatus(){const state=sound.state();$('#audioNote').textContent=!state.enabled?'DEMO · ♫ apagado':state.mode?'DEMO · ♫ activado':'DEMO · Sonido al jugar';$('#audioMenu').textContent=state.enabled?'Silenciar sonido':'Activar sonido';$('#audioMenu').setAttribute('aria-pressed',String(state.enabled));}
+function calmAfterPlay(){clearTimeout(calmTimer);calmTimer=setTimeout(()=>{if(!busy){void sound.activate('calm');audioStatus();}},10000);}
+function stakeChanged(previous){if(stake===previous)return;if(!hasPlayed)void sound.activate('active');void sound.effect(stake>previous?'up':'down');audioStatus();}
 const format=value=>(value/100).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2});
 function base(){ctx.drawImage(image,FRAME.x,FRAME.y,FRAME.w,FRAME.h,0,0,886,1414);}
 function paint(){
@@ -35,23 +39,27 @@ function paint(){
 }
 function controls(){const stopped=rounds.length>=10;$('.spin-control').disabled=!ready||stopped;$('.spin-control').setAttribute('aria-label',busy?'Detener los rodillos':'Girar una ronda de demostración');for(const s of ['.plus-control','.minus-control','.stake-control','.reset-control','.sound-control','.info-control'])$(s).disabled=!ready||busy;$('#resetMenu').disabled=busy;}
 function info(){const used=rounds.reduce((s,r)=>s+r.stake,0),paid=rounds.reduce((s,r)=>s+r.payout,0);$('#summary').textContent=`${rounds.length} rondas · Usadas: ${format(used)} · Recibidas: ${format(paid)} · Neto: ${format(paid-used)} fichas.`;$('#history').replaceChildren();rounds.forEach((r,i)=>{const tr=document.createElement('tr');[String(i+1),format(r.stake),format(r.payout),format(r.payout-r.stake)].forEach(text=>{const td=document.createElement('td');td.textContent=text;tr.append(td);});$('#history').append(tr);});if(!$('#info').open)$('#info').showModal();}
-async function audioToggle(){const audio=$('#audio');if(muted){try{await audio.play();muted=false;}catch{$('#status').textContent='Tocá nuevamente para activar el audio.';return;}}else{audio.pause();muted=true;}$('#audioNote').textContent=muted?'DEMO · ♫ apagado':'DEMO · ♫ activado';}
-function changeStake(direction){if(busy)return;const values=[250,500,1000,1250,2000,2500,5000,10000,12500,25000,50000,100000,250000,500000,2500000];let i=values.findIndex(v=>v>=stake);stake=values[Math.max(0,Math.min(values.length-1,i+direction))];syncStake();changed=true;paint();$('#status').textContent='Fichas por ronda: '+format(stake);}
-function reset(){if(busy)return;clearInterval(autoTimer);remaining=0;balance=533340;rounds=[];grid=null;spinPlan=null;lastPayout=0;phase='idle';changed=stake!==250;paint();controls();$('#status').textContent='Demostración reiniciada.';}
+async function audioToggle(){sound.configure({enabled:!sound.state().enabled});if(sound.state().enabled&&!await sound.unlock())$('#status').textContent='No se pudo activar el audio. Tocá nuevamente para reintentar.';audioStatus();}
+for(const [id,key]of [['#musicEnabled','music'],['#effectsEnabled','effects']])$(id).addEventListener('change',event=>sound.configure({[key]:event.target.checked}));
+for(const [id,key]of [['#musicVolume','musicVolume'],['#effectsVolume','effectsVolume']])$(id).addEventListener('input',event=>sound.configure({[key]:Number(event.target.value)/100}));
+audioStatus();
+function changeStake(direction){if(busy)return;const previous=stake;const values=[250,500,1000,1250,2000,2500,5000,10000,12500,25000,50000,100000,250000,500000,2500000];let i=values.findIndex(v=>v>=stake);stake=values[Math.max(0,Math.min(values.length-1,i+direction))];syncStake();stakeChanged(previous);changed=true;paint();$('#status').textContent='Fichas por ronda: '+format(stake);}
+function reset(){if(busy)return;stopHyper();clearTimeout(calmTimer);hasPlayed=false;sound.reset();audioStatus();clearInterval(autoTimer);remaining=0;balance=533340;rounds=[];grid=null;spinPlan=null;lastPayout=0;phase='idle';changed=stake!==250;paint();controls();$('#status').textContent='Demostración reiniciada.';}
 $('.spin-control').addEventListener('click',()=>{
- if(busy){finishRequested=true;return;}
+ if(busy){spinElapsed=Math.max(spinElapsed,performance.now()-spinStarted);spinPlan=ReelView.requestStop(spinPlan,spinElapsed);$('#status').textContent='Deteniendo los rodillos restantes.';return;}
  if(!ready||rounds.length>=10)return;
  if(balance<stake){$('#status').textContent='Fichas ficticias insuficientes.';return;}
  const before=grid||ReelView.initial,result=AulaAzar.round(balance,stake),spent=stake;
- balance-=spent;changed=true;busy=true;phase='spin';lastPayout=0;finishRequested=false;
+ balance-=spent;changed=true;busy=true;phase='spin';lastPayout=0;hasPlayed=true;clearTimeout(calmTimer);sound.startSpin();audioStatus();
  const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
  spinPlan=ReelView.plan(before,result.grid,fast,reduced);grid=result.grid;spinElapsed=0;controls();
  $('#status').textContent='Girando una ronda de demostración.';
- const start=performance.now(),duration=Math.max(...spinPlan.map(s=>s.duration));
- function frame(now){spinElapsed=finishRequested?duration:now-start;
-  if(spinElapsed<duration){paint();animation=requestAnimationFrame(frame);return;}
+ spinStarted=performance.now();const stoppedReels=new Set();
+ function frame(now){spinElapsed=now-spinStarted;
+  spinPlan.forEach((spin,column)=>{if(!ReelView.sample(spin,spinElapsed).active&&!stoppedReels.has(column)){stoppedReels.add(column);sound.reelStop();}});
+  if(spinElapsed<Math.max(...spinPlan.map(ReelView.endTime))){paint();animation=requestAnimationFrame(frame);return;}
   balance=result.balance;lastPayout=result.payout;grid=result.grid;spinPlan=null;
-  rounds.push({stake:spent,payout:result.payout});busy=false;phase=rounds.length>=10?'end':'complete';paint();controls();
+  rounds.push({stake:spent,payout:result.payout});busy=false;sound.endSpin();if(lastPayout>0)void sound.effect('win');calmAfterPlay();phase=rounds.length>=10?'end':'complete';paint();controls();
   $('#status').textContent=`Ronda ${rounds.length}. Recibidas ${format(result.payout)}. Saldo ${format(balance)} fichas ficticias.`;
   if(rounds.length>=10)info();
  }
@@ -60,20 +68,21 @@ $('.spin-control').addEventListener('click',()=>{
 $('.plus-control').addEventListener('click',()=>changeStake(1));$('.minus-control').addEventListener('click',()=>changeStake(-1));$('.reset-control').addEventListener('click',()=>$('#autoplay').showModal());$('.info-control').addEventListener('click',()=>{drawRules();$('#rules').showModal();});$('.sound-control').addEventListener('click',()=>$('#hyperplay').showModal());$('.menu-control').addEventListener('click',()=>$('#menu').showModal());$('.stake-control').addEventListener('click',()=>(stakeFields(),$('#stakes').showModal()));$('.speed-control').addEventListener('click',()=>{fast=!fast;$('.speed-control').setAttribute('aria-pressed',String(fast));$('#status').textContent=fast?'Animación rápida':'Animación normal';});
 $('.fullscreen').addEventListener('click',async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await $('.reference-game').requestFullscreen();}catch{$('#status').textContent='La pantalla completa no está disponible en este navegador.';}});
 $('#openInfo').addEventListener('click',()=>{$('#menu').close();info();});$('#audioMenu').addEventListener('click',audioToggle);$('#resetMenu').addEventListener('click',()=>{reset();$('#menu').close();});
-document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',()=>b.closest('dialog').close()));document.querySelectorAll('[data-stake]').forEach(b=>b.addEventListener('click',()=>{if(busy)return;stake=Number(b.dataset.stake);changed=true;paint();$('#stakes').close();}));
-document.addEventListener('visibilitychange',()=>{if(document.hidden)$('#audio').pause();else if(!muted)$('#audio').play().catch(()=>{});});
+document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',()=>b.closest('dialog').close()));document.querySelectorAll('[data-stake]').forEach(b=>b.addEventListener('click',()=>{if(busy)return;const previous=stake;stake=Number(b.dataset.stake);stakeChanged(previous);changed=true;paint();$('#stakes').close();}));
+document.addEventListener('visibilitychange',()=>sound.setHidden(document.hidden));
+window.addEventListener('pagehide',()=>sound.setHidden(true));window.addEventListener('pageshow',()=>sound.setHidden(document.hidden));
 image.onload=async()=>{try{await atlasReady;ReelView.configure(atlasImages);ready=true;paint();controls();}catch{$('#status').textContent='No se pudieron cargar los gráficos del juego. Recargá la página.';}};image.onerror=()=>{$('#status').textContent='No se pudo cargar la imagen de referencia. Recargá la página.';const p=document.createElement('p');p.className='loading-error';p.textContent='No se pudo cargar la imagen. Revisá la conexión y recargá.';$('.reference-game').append(p);};if(image.complete&&image.naturalWidth)image.onload();controls();
 
 let coins=1,coinIndex=0;const coinValues=[50,100,200,500,1000,2000,5000,10000,50000];
 function stakeFields(){syncStake();document.querySelector('#coinCount').textContent=coins;document.querySelector('#coinValue').textContent=format(coinValues[coinIndex])+' ARS';document.querySelector('#totalStake').textContent=format(stake)+' ARS';}
-document.querySelectorAll('[data-adjust]').forEach(b=>b.onclick=()=>{const [field,d]=b.dataset.adjust.split(':');if(field==='coins')coins=Math.max(1,Math.min(10,coins+Number(d)));else if(field==='value')coinIndex=Math.max(0,Math.min(coinValues.length-1,coinIndex+Number(d)));else {changeStake(Number(d));stakeFields();return;}stake=5*coins*coinValues[coinIndex];changed=true;paint();stakeFields();});
-document.querySelector('#maxStake').onclick=()=>{coins=10;coinIndex=8;stake=2500000;changed=true;paint();stakeFields();};stakeFields();
+document.querySelectorAll('[data-adjust]').forEach(b=>b.onclick=()=>{if(busy)return;const previous=stake,[field,d]=b.dataset.adjust.split(':');if(field==='coins')coins=Math.max(1,Math.min(10,coins+Number(d)));else if(field==='value')coinIndex=Math.max(0,Math.min(coinValues.length-1,coinIndex+Number(d)));else {changeStake(Number(d));stakeFields();return;}stake=5*coins*coinValues[coinIndex];stakeChanged(previous);changed=true;paint();stakeFields();});
+document.querySelector('#maxStake').onclick=()=>{if(busy)return;const previous=stake;coins=10;coinIndex=8;stake=2500000;stakeChanged(previous);changed=true;paint();stakeFields();};stakeFields();
 let autoTimer=null,remaining=0;
 function autoStart(dialog){dialog.close();remaining=Number(document.querySelector(dialog.id==='hyperplay'?'#hyperCount':'#autoCount').value);fast=dialog.id==='hyperplay'||$('#turboAuto').checked||$('#fastAuto').checked;clearInterval(autoTimer);autoTimer=setInterval(()=>{if(busy)return;if(!remaining||rounds.length>=10||balance<stake){clearInterval(autoTimer);return;}remaining--;document.querySelector('.spin-control').click();},300);}
 document.querySelector('#startAuto').onclick=()=>autoStart(document.querySelector('#autoplay'));
 let hyperTimer=null;
-function stopHyper(){clearInterval(hyperTimer);hyperTimer=null;$('#hyperStart').textContent='▶';}
-$('#hyperStart').onclick=()=>{if(hyperTimer){stopHyper();return;}if(busy)return;let left=Number($('#hyperCount').value);$('#hyperStart').textContent='Ⅱ';hyperTimer=setInterval(()=>{if(left<=0||rounds.length>=10||balance<stake){stopHyper();return;}const result=AulaAzar.round(balance,stake);balance=result.balance;grid=result.grid;rounds.push({stake,payout:result.payout});left--;changed=true;phase=rounds.length>=10?'end':'complete';paint();controls();hyperFields();$('#hyperSpent').textContent=format(rounds.reduce((sum,r)=>sum+r.stake,0));$('#hyperPaid').textContent=format(rounds.reduce((sum,r)=>sum+r.payout,0));$('.hyper-columns').textContent='TIRADA '+rounds.length+' · GANANCIA '+format(result.payout)+' · CRÉDITO '+format(balance);if($('#hyperStop').checked&&result.payout>0)stopHyper();},180);};
+function stopHyper(){const wasRunning=!!hyperTimer;clearInterval(hyperTimer);hyperTimer=null;if(wasRunning)calmAfterPlay();$('#hyperStart').textContent='▶';}
+$('#hyperStart').onclick=()=>{if(hyperTimer){stopHyper();return;}if(busy)return;hasPlayed=true;clearTimeout(calmTimer);void sound.activate('active');audioStatus();let left=Number($('#hyperCount').value);$('#hyperStart').textContent='Ⅱ';hyperTimer=setInterval(()=>{if(left<=0||rounds.length>=10||balance<stake){stopHyper();return;}const result=AulaAzar.round(balance,stake);balance=result.balance;grid=result.grid;rounds.push({stake,payout:result.payout});left--;changed=true;phase=rounds.length>=10?'end':'complete';paint();controls();hyperFields();$('#hyperSpent').textContent=format(rounds.reduce((sum,r)=>sum+r.stake,0));$('#hyperPaid').textContent=format(rounds.reduce((sum,r)=>sum+r.payout,0));$('.hyper-columns').textContent='TIRADA '+rounds.length+' · GANANCIA '+format(result.payout)+' · CRÉDITO '+format(balance);if($('#hyperStop').checked&&result.payout>0)stopHyper();},180);};
 $('#hyperplay').addEventListener('close',stopHyper);
 
 document.querySelector('#openHyper').onclick=()=>{document.querySelector('#autoplay').close();document.querySelector('#hyperplay').showModal();};
@@ -81,7 +90,7 @@ document.querySelector('#autoCount').oninput=e=>{document.querySelector('#autoNu
 
 function hyperFields(){$('#hyperStake').textContent=format(stake)+' ARS';$('#hyperCredit').textContent=format(balance)+' ARS';$('#hyperCountLabel').textContent=$('#hyperCount').value;}
 $('#hyperMinus').onclick=()=>{changeStake(-1);hyperFields();};$('#hyperPlus').onclick=()=>{changeStake(1);hyperFields();};
-$('#hyperBetRange').oninput=e=>{stake=[250,500,1000,1250,2000,2500,5000,10000,12500,25000,50000,100000,250000,500000,2500000][Number(e.target.value)];changed=true;paint();hyperFields();};
+$('#hyperBetRange').oninput=e=>{if(busy)return;const previous=stake;stake=[250,500,1000,1250,2000,2500,5000,10000,12500,25000,50000,100000,250000,500000,2500000][Number(e.target.value)];stakeChanged(previous);changed=true;paint();hyperFields();};
 $('#hyperCount').oninput=hyperFields;for(const [id,dir] of [['#hyperCountMinus',-1],['#hyperCountPlus',1]])$(id).onclick=()=>{$('#hyperCount').value=Math.max(1,Math.min(100,Number($('#hyperCount').value)+dir));hyperFields();};
 $('.sound-control').addEventListener('click',hyperFields);$('#openHyper').addEventListener('click',hyperFields);
 

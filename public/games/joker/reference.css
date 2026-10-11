@@ -46,3 +46,5 @@
 #autoplay{inset:calc((100dvh - var(--game-h))/2 + var(--game-h)*.0134) 0 auto;margin:0 auto;background-position:51.765% 48.006%}
 
 #rules{position:fixed;inset:calc((100dvh - var(--game-h))/2 + var(--game-h)*.012) 0 auto;margin:0 auto;width:calc(var(--game-w)*.932);height:auto;max-height:calc(var(--game-h)*.9);max-width:none;background:#08050b;border-radius:calc(var(--game-w)*.025);padding:0;overflow-y:auto}#rulesCanvas{width:100%;height:auto;display:block}#rules .close{position:absolute;right:0;top:0;width:10%;height:7%;color:transparent;font-size:0;background:transparent;border:0}#rules .rules-note{font:calc(var(--game-w)*.012) Arial;line-height:1.4;padding:8px;margin:0;color:#aaa}
+
+.audio-settings{display:grid;gap:12px;margin:16px 0;padding:14px;border:1px solid #735481;border-radius:6px}.audio-settings legend{padding:0 7px}.audio-settings label{display:flex;align-items:center;gap:8px;font-size:14px}.audio-settings input[type=range]{width:100%;accent-color:#bdb3e5}.audio-settings input[type=checkbox]{accent-color:#bdb3e5;width:18px;height:18px}

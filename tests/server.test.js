@@ -56,7 +56,7 @@ test('Autenticación, autorización, banners y persistencia real', async t => {
       const route = '/games/joker/index.html';
       for (const cookie of [undefined, player.cookie]) {
         const game = await request(route, 'GET', undefined, cookie);
-        assert.equal(game.status, 200); assert.match(game.headers.get('content-type'), /text\/html/);
+        assert.equal(game.status, 200); assert.match(game.headers.get('content-type'), /text\/html/); assert.equal(game.headers.get('cache-control'), 'no-store');
         assert.match(game.data, /href="\/jugadores\/slots"/);
         assert.match(game.data, /DEMO · FICHAS DE PRUEBA/);
         for (const [, asset] of game.data.matchAll(/(?:src|href)="([^"#]+)"/g)) {
@@ -67,7 +67,7 @@ test('Autenticación, autorización, banners y persistencia real', async t => {
         }
       }
       const directory = path.join(process.cwd(), 'public/games/joker/assets');
-      for (const file of fs.readdirSync(directory)) assert.equal((await request('/games/joker/assets/' + file)).status, 200, file);
+      for (const file of fs.readdirSync(directory)) { const asset=await request('/games/joker/assets/' + file); assert.equal(asset.status, 200, file); if(file.endsWith('.mp3')) assert.equal(asset.headers.get('content-type'), 'audio/mpeg'); }
       assert.equal((await request('/api/me', 'GET', undefined, player.cookie)).data.user.balance, before);
     });
     await t.test('el administrador ve las dos cuentas iniciales en Usuarios', async () => {
