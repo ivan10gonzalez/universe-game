@@ -1,75 +1,76 @@
-# Universe Game
+# Panel blanco · gestión de sitios
 
-Plataforma de jugadores con fichas virtuales, una demo educativa de Joker y panel Master Root conservado. No hay dinero real, cuotas ni proveedores conectados.
+Versión independiente dedicada a sitios, cuentas, permisos y banners. El servidor activo no sirve juegos, páginas de jugadores, saldos, movimientos, proveedores ni APIs anteriores. La estética conserva el menú lateral claro, fondo gris azulado, formularios blancos y botones celestes del panel de referencia.
 
-## Arranque
+## Acceso de demostración
 
-Node.js 18 o posterior. No requiere base de datos externa ni dependencias de ejecución.
+| Rol | Usuario inicial | Contraseña inicial |
+| --- | --- | --- |
+| Super Master | `super_master` | `SuperMasterDemo2026!` |
+| Master del sitio Universe, solo en instalación nueva | `universe_admin` | `UniverseAdmin2026!` |
+
+Estas credenciales demo se incluyen en el código por indicación del usuario. Usar exclusivamente datos de prueba. Se pueden cambiar desde el menú de cuenta → Cambiar contraseña. Un cambio invalida las sesiones de esa cuenta y se conserva al reiniciar. El valor de `SUPER_MASTER_PASSWORD` permite reemplazar la clave inicial del Super Master en el primer arranque, pero nunca sobrescribe contraseñas de una base existente.
+
+Abrir `/` o `/admin` para ingresar. Las cuentas creadas desde Usuarios pueden iniciar sesión en ese mismo formulario.
+
+## Jerarquía
+
+- **Super Master:** tiene **Sitios** al final del menú. Puede crear sitios, seleccionar uno, administrar sus banners/configuración y crear únicamente cuentas Master. Puede restablecer las contraseñas de los Masters.
+- **Master:** queda vinculado a un solo sitio. No tiene Sitios, no puede crear Masters y puede crear agentes. Administra los usuarios, banners, configuración y actividad de su propio sitio.
+- **Agente:** puede crear agentes debajo de su cuenta y estos pueden crear más subagentes. Ve únicamente su cuenta y descendientes. No accede a otras ramas, otros sitios, banners, configuración ni actividad general. Su menú contiene Usuarios, Reportes globales de cuentas y Mi resumen.
+
+El servidor determina rol, sitio y responsable. Rechaza intentos de asignarlos libremente desde el navegador. Los Masters pueden restablecer contraseñas de agentes de su sitio; los agentes solo las de sus descendientes. Nadie puede usar ese mecanismo para cambiar las claves de superiores o de cuentas de otra rama. El cambio propio exige la contraseña actual.
+
+## Cómo probar
+
+1. Ingresar como `super_master`.
+2. Abrir el menú → **Sitios**. Seleccionar Universe o crear otro sitio.
+3. Entrar a Usuarios → **Nuevo Master** y definir sus credenciales.
+4. Salir e ingresar como ese Master. Aparece **Nuevo agente**, sin Sitios.
+5. Crear un agente e ingresar con él. Puede crear otros agentes, pero no Masters.
+6. Volver al Super Master, seleccionar otro sitio y comprobar que cambian usuarios, banners, configuración y actividad.
+
+La selección es explícita en cada URL de la API; no existe un sitio seleccionado global para todo el servidor. Cambiar el sitio en una sesión no cambia la selección de otra persona.
+
+## Desarrollo y Render
+
+Node.js 20 o posterior, sin dependencias de ejecución.
 
 ```sh
 npm start
-```
-
-Abrir `http://localhost:3000/`. Se puede definir `PORT` si el hosting lo proporciona. La raíz siempre muestra el acceso compartido.
-
-| Rol | Usuario inicial | Contraseña inicial | Destino |
-| --- | --- | --- | --- |
-| Administrador demo | `universe_admin` | `UniverseAdmin2026!` | `/admin` |
-| Jugador demo | `universe_player` | `UniversePlayer2026!` | `/jugadores` |
-
-Las cuentas se provisionan durante el arranque normal, sin flags ni endpoints de creación administrativa. El jugador nuevo comienza con 10.000 fichas virtuales. El saldo del encabezado se obtiene de su cuenta en el servidor. Son cuentas de demostración autorizadas para este modelo; las credenciales están documentadas deliberadamente.
-
-La provisión es idempotente. No cambia contraseñas, saldos ni usuarios preexistentes. Si un nombre ya existe antes de la provisión, conserva esa cuenta y crea la demo con sufijo `_2`, `_3`, etc.; el nombre creado aparece en el log del primer arranque. Los IDs asignados quedan guardados en `demoAccounts`. Una contraseña cambiada en los datos no se restablece en el siguiente arranque.
-
-## Persistencia
-
-Por defecto se guarda en `data/universe.json` y `data/uploads/`, fuera de las rutas públicas y excluidos de Git. Se escribe el JSON mediante archivo temporal, fsync y renombrado. Si la base es inválida, el proceso falla sin reemplazarla. Esta implementación admite **una instancia de servidor** sobre un directorio de datos; no es una base distribuida.
-
-Un reinicio del proceso conserva los datos en el mismo disco. Para conservarlos también al reemplazar contenedores o desplegar en un hosting efímero, `DATA_DIR` debe apuntar a su volumen persistente. Hacer copia de todo el directorio, incluidos `universe.json` y `uploads/`.
-
-No se conoce una URL verificada ni la configuración del servicio Render de este proyecto. No se cambió hosting ni se lanzó un deploy manual. Si el servicio existente despliega desde `main`, el push puede disparar ese flujo. El comando de inicio es `npm start`; para persistencia entre despliegues en Render, comprobar que el servicio tenga un disco persistente y que `DATA_DIR` señale su ruta. Las cuentas se crean igualmente al arrancar una instancia nueva; no se afirma que un servicio remoto las haya creado hasta probar su URL.
-
-## Banners
-
-Ingresar como administrador → menú → **Banners Inicio / Slots**.
-
-- Dos destinos independientes; subir PNG, JPG o WebP de hasta 4 MB.
-- Vista previa antes de guardar, edición de título y subtítulo, orden numérico, activar/desactivar y eliminar.
-- Inicio usa un marco vertical en móvil; Slots, un marco horizontal 3,6:1. Preparar las imágenes con estas proporciones y texto alejado de los bordes. Las imágenes subidas ya contienen su composición: el título se usa como texto alternativo, sin superponerlo.
-- Los banners guardados se reflejan al abrir o recargar la vista del jugador. Las flechas/puntos permiten recorrer los activos en su orden.
-- Los dos banners iniciales solo se siembran una vez; eliminarlos o desactivarlos no los regenera.
-
-Se conservó el panel original (estadísticas, menús y tarjetas visuales). Antes de este cambio sus módulos eran una maqueta estática y el acceso no validaba credenciales; no se agregaron funcionalidades ficticias a esos módulos. La ampliación administrativa es exclusivamente banners, más los controles de sesión necesarios.
-
-## Jugadores
-
-Portada galáctica, selección promocional, bloque deportivo, zonas de catálogo vacías, franja social y pie de página. Menú móvil con Inicio, Deportes, Slots, Casino en vivo, CABALLOS y CrazZy Win!.
-
-Deportes y Caballos tienen rutas vacías con navegación para volver. Slots y Casino tienen catálogo vacío; filtros de favoritos/recientes y búsqueda muestran únicamente estados vacíos. No se inventan proveedores ni enlaces sociales. Chat y notificaciones informan honestamente su estado; Mi cuenta incluye saldo y cierre de sesión.
-
-## Autenticación y límites del modelo
-
-El servidor decide el rol; rutas y APIs administrativas rechazan jugadores. Las contraseñas utilizan scrypt con salt, y las sesiones cookies HttpOnly/SameSite con caducidad de ocho horas (Secure cuando la solicitud llega por HTTPS). Las sesiones se invalidan al cerrar sesión y al reiniciar el servidor; después se puede volver a ingresar con las mismas cuentas. Las mutaciones requieren cabecera propia y validación de origen. Hay límite de intentos de login por IP. La raíz del repositorio y los datos no se sirven como archivos estáticos.
-
-## Verificación
-
-```sh
 npm test
 ```
 
-Prueba integradora con 8 subcasos (9 resultados incluyendo el contenedor): acceso anónimo, archivos privados, contraseña inválida, origen externo, ambos roles, cookies, permisos, subida y separación de banners, edición/estado/borrado, logout, reinicio y conservación de cuentas/saldos/contraseñas ante conflictos.
+El comando de inicio sigue siendo `npm start` (también funciona `node server.js`). Render puede desplegar este commit si el servicio está conectado a esta rama y tiene auto-deploy activado. El código subido no demuestra que el despliegue haya finalizado: comprobar `/api/health`, que devuelve `service: "site-management"`.
 
-La comprobación visual en navegador y las capturas no deben considerarse aprobadas solo porque pasen estos tests. Consultar `QA.md` para el alcance comprobado y los límites del entorno de entrega.
+Variables opcionales:
 
-## Recursos gráficos
+- `PORT`: puerto HTTP, por defecto 3000.
+- `HOST`: interfaz, por defecto `0.0.0.0`.
+- `DATA_DIR`: directorio persistente, por defecto `data/`.
+- `SUPER_MASTER_PASSWORD`: contraseña inicial alternativa; entre 12 y 128 caracteres.
+- `NODE_ENV=production`: exige cookies Secure (usar HTTPS).
 
-Los gráficos galáctico, ruleta, cartas y deportes fueron generados para esta implementación y optimizados en WebP. El logotipo de texto, las tipografías Metropolis y los seis iconos genéricos de navegación se obtuvieron de los recursos públicos de `universegame.co`, la referencia indicada por el usuario. No se descargó ningún juego ni catálogo. El orbital combina un SVG de órbitas con el logotipo; el diseño es una reconstrucción, no una captura utilizada como página. El logotipo original del panel sigue conservado.
+## Separación y preservación de los datos
 
+El nuevo servidor almacena sus datos en **`DATA_DIR/management.json`**. No modifica `universe.json` ni su carpeta de imágenes. Si al primer arranque existe el archivo anterior, se copian únicamente las identidades administrativas: `admin` pasa a Master del sitio Universe y `agent` pasa a agente. Se conservan sus nombres, hashes de contraseña y relaciones válidas; no se importan jugadores, saldos, movimientos ni banners anteriores. La importación solo ocurre una vez.
 
-## Demo de Joker en la plataforma
+Si no hay cuentas administrativas anteriores disponibles, se crea un sitio Universe y el Master demo de la tabla. Si la base anterior o su jerarquía son inválidas, el proceso falla sin reemplazar esos datos. Tener un repositorio privado no conserva la base: para persistencia entre despliegues, `DATA_DIR` debe apuntar a un disco persistente y hay que guardar copias de seguridad. Un despliegue en disco efímero puede perder las cuentas nuevas.
 
-Inicio → Tragamonedas y Slots incluyen una tarjeta de **Joker’s Jewels** que abre `/games/joker/index.html` en la misma pestaña. La demo tiene navegación para volver a Slots y audio opcional. Se puede probar sin iniciar sesión; sus fichas se reinician al cargar la demo y nunca modifican el saldo de la cuenta. Favoritos y Recientes se guardan en este navegador, separados por usuario.
+La implementación admite **una sola instancia/proceso** por directorio de datos. Guarda cambios mediante escritura temporal, fsync y renombrado, y actualiza la memoria solo después de guardarlos. Contraseñas con scrypt y salt; cookies HttpOnly/SameSite, expiración de ocho horas y validación de origen en mutaciones.
 
-La copia estática procede de `ivan10gonzalez/Juegos-`; `public/games/joker/source.json` registra el commit incorporado. Para actualizarla después de modificar Juegos, ejecutar `node scripts/sync-joker.mjs /ruta/al/repositorio/Juegos- <commit>` y publicar también este repositorio. La sincronización entre ambos repositorios no es automática. El script conserva la barra de regreso definida en `platform.css`.
+Los archivos del prototipo anterior siguen recuperables en Git y algunos permanecen en el repositorio por compatibilidad de historial, pero el servidor tiene una lista cerrada de archivos públicos y no los sirve ni los importa. No se modificó el repositorio independiente `Juegos-`.
 
-Actualización de Joker 2026-10-10: entrada en silencio, pistas activa y tranquila separadas, efecto de apuesta sin música mezclada, controles de volumen y frenado manual de las columnas restantes. El HTML del juego se sirve sin caché y su tarjeta usa una versión de lanzamiento para evitar combinar HTML antiguo con scripts nuevos.
+## Banners y reportes
+
+Hasta 20 banners por sitio, PNG/JPG/WebP de hasta 1 MB; orden, título, vista previa, edición, estado y eliminación. Se guardan como datos del panel, sin publicar hacia otras plataformas. Reportes y resumen muestran cuentas del alcance autorizado; no contienen datos económicos. La actividad conserva los últimos 2.000 eventos por sitio y muestra los 100 más recientes.
+
+## Verificación
+
+`npm test` cubre rutas públicas y privadas, creación de Masters y varios niveles de agentes, aislamiento por sitio y rama, intentos de escalar permisos, banners, configuración, cambio/restablecimiento de claves, revocación de sesiones, validación de origen, límites de login, reinicio e importación sin copiar saldos ni modificar los datos anteriores.
+
+Ver `QA.md` para las comprobaciones visuales y sus límites.
+
+## Recursos visuales
+
+Diseño prioritario para celular, contrastado con la referencia a 393 px de ancho. Las fuentes y los iconos se sirven desde el propio proyecto: Roboto (`roboto-fontface` 0.10.0) y Font Awesome Free 5.7.0. Sus licencias acompañan los archivos en `management/public/fonts/`. No requieren conexión con el sitio de referencia ni un CDN. La adaptación de escritorio queda como base para una revisión posterior.

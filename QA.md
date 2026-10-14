@@ -1,28 +1,19 @@
-# Verificación de entrega
+# Verificación del panel de gestión de sitios
 
-## Ejecutado
+Fecha: 14 de octubre de 2026.
 
-- `node --test tests/server.test.js`: 9 resultados correctos, sin fallos.
-- Servidor local arrancado por el comando normal; cuentas demo creadas sin flags.
-- Login HTTP real de administrador y jugador; contraseña incorrecta rechazada.
-- API y rutas privadas protegidas, redirecciones por rol y logout invalidando la cookie.
-- Subida PNG, lectura del archivo protegido, separación Inicio/Slots, edición, orden, activación/desactivación y borrado.
-- Reinicio del proceso: se mantienen usuarios, hashes, saldo modificado, banners y archivos. Las cuentas vuelven a iniciar sesión.
-- Conflicto de nombre: la cuenta anterior conserva sus datos y la demo recibe un sufijo.
-- Lectura visual de las siete capturas de referencia originales; recursos de juegos omitidos.
+- Pruebas automáticas de servidor: 11 resultados aprobados. Incluyen creación de agentes por agentes, tercera generación, ramas aisladas, sitios separados, intentos de crear Masters desde roles inferiores, banners de distintos sitios, restablecimiento y revocación de sesiones, persistencia e importación limitada a identidades administrativas.
+- El código del cliente y el arranque pasan la comprobación de sintaxis de Node.
+- Navegador real: acceso del Super Master, Sitios al final del menú, selección del sitio, creación de un sitio local de prueba, acceso del Master sin Sitios, y revisión en viewport móvil de 393 × 852.
+- Las pruebas de UI usan una base local independiente en `/private/tmp`; sus sitios de prueba y sesiones no se publican.
+- El despliegue de Render no se considera verificado por el push. El endpoint `/api/health` debe identificar `site-management` en la instancia remota.
 
-- Prueba funcional adicional con DOM (jsdom 30, servidor HTTP real): login inválido/válido, redirección de jugador, apertura/cierre de menú, Inicio/Slots/Casino/Deportes/Caballos, estados vacíos de filtros y búsqueda, carga HTTP de todos los recursos de imagen, modal de cuenta, logout y edición real de banner desde el panel. Sin excepciones JS en esta prueba. No sustituye a un navegador ni comprueba layout.
+El menú y reportes de esta versión son de administración general. No se sirven rutas de juegos, saldos, jugadores ni APIs del prototipo anterior.
 
-## Limitaciones pendientes
+## Referencia visual móvil
 
-El entorno local impidió iniciar un navegador. Se intentaron Chromium 151 (headless y navegador completo) y Chromium 134: finalizaron con SIGTRAP/SIGABRT antes de cargar la aplicación. Las herramientas `cua_repl` y `node_repl` también fallaron al iniciar por un error del perfil `sandbox-exec` (`unbound variable: TIOCSTI`). No hay capturas de la aplicación ni validación visual real de overflow, errores de consola o interacción móvil/escritorio. No se afirma igualdad píxel a píxel.
+Se inspeccionó el panel de referencia en el navegador sin enviar formularios ni modificar sus cuentas. Medidas obtenidas del DOM renderizado a 393 px: Roboto 300/400/500, menú lateral 240 px, filas de menú 36 px con texto de 12,8 px; barra superior 46,5 px; tabla 14,4 px; botones pequeños 10,24 px y 31,36 px de alto; menú de cuenta 189 px y texto 14,4 px. Se aplicaron esas medidas y los colores #708090, #ff3547, #00bcd4 y #4285f4.
 
-No hay URL verificada de Render ni comprobación de cuentas en una instancia remota. La persistencia se probó reiniciando el proceso sobre el mismo directorio; un hosting con almacenamiento efímero requiere un volumen persistente para sobrevivir al reemplazo de contenedores.
+Las fuentes Roboto y los iconos Font Awesome Free 5.7.0 se incluyen localmente con sus licencias, obtenidos de los paquetes públicos npm. No se copió código privado, sesiones ni datos del sitio de referencia. La estructura de roles y las secciones siguen correspondiendo a gestión de sitios: no se afirma equivalencia funcional ni visual absoluta entre pantallas de contenido diferente.
 
-## Revisión visual que falta al recuperar el navegador
-
-1. Abrir `/` a 360×800, 390×844 y 1440×1000; probar error de login y ambos roles.
-2. Comparar portada, menú abierto, promociones, franjas y pie con IMG_5022–IMG_5027; revisar scroll y ausencia de overflow.
-3. Comparar Slots con IMG_5028 conservando el catálogo vacío; comprobar filtros, búsqueda y navegación a Deportes/Caballos.
-4. Administrador: subir un banner en cada destino, previsualizar, guardar y comprobarlo como jugador; editar orden, desactivar y borrar.
-5. Reiniciar, ingresar otra vez y verificar persistencia; comprobar cierre de sesión y falta de errores JS.
+Comprobación en navegador a 393 × 852: fuentes cargadas, sin desbordamiento horizontal, barra de 46,5 px, tabla de 14,4 px, formulario de creación de agentes y consola sin errores. También se verificó el árbol de agentes y subagentes y la ausencia de Sitios en el acceso de un agente.
