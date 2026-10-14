@@ -15,16 +15,16 @@ Abrir `/` o `/admin` para ingresar. Las cuentas creadas desde Usuarios pueden in
 
 ## Jerarquía
 
-- **Super Master:** tiene **Sitios** al final del menú. Puede crear sitios, seleccionar uno, administrar sus banners/configuración y crear únicamente cuentas Master. Puede restablecer las contraseñas de los Masters.
+- **Super Master:** tiene **Sitios** al final del menú. Comparte todas las secciones del Master y puede seleccionar el sitio que administra. Crea únicamente cuentas Master y puede restablecer contraseñas de Masters y agentes del sitio seleccionado. «Nuevo sitio», justo encima de «Sitios», muestra Panel blanco, Panel violeta y Original: son opciones deshabilitadas de muestra y no crean plataformas.
 - **Master:** queda vinculado a un solo sitio. No tiene Sitios, no puede crear Masters y puede crear agentes. Administra los usuarios, banners, configuración y actividad de su propio sitio.
-- **Agente:** puede crear agentes debajo de su cuenta y estos pueden crear más subagentes. Ve únicamente su cuenta y descendientes. No accede a otras ramas, otros sitios, banners, configuración ni actividad general. Su menú contiene Usuarios, Reportes globales de cuentas y Mi resumen.
+- **Agente:** puede crear agentes debajo de su cuenta y estos pueden crear más subagentes. Ve únicamente su cuenta y descendientes. No accede a otras ramas, otros sitios, banners, configuración ni actividad general. Su menú contiene Usuarios, Reportes Globales, Reportes de Fichas, Reportes de Juegos, Finanzas y Mi resumen.
 
 El servidor determina rol, sitio y responsable. Rechaza intentos de asignarlos libremente desde el navegador. Los Masters pueden restablecer contraseñas de agentes de su sitio; los agentes solo las de sus descendientes. Nadie puede usar ese mecanismo para cambiar las claves de superiores o de cuentas de otra rama. El cambio propio exige la contraseña actual.
 
 ## Cómo probar
 
 1. Ingresar como `super_master`.
-2. Abrir el menú → **Sitios**. Seleccionar Universe o crear otro sitio.
+2. Abrir el menú → **Sitios**. Seleccionar Universe u otro sitio existente. «Nuevo sitio» solo muestra los tres diseños previstos.
 3. Entrar a Usuarios → **Nuevo Master** y definir sus credenciales.
 4. Salir e ingresar como ese Master. Aparece **Nuevo agente**, sin Sitios.
 5. Crear un agente e ingresar con él. Puede crear otros agentes, pero no Masters.
@@ -63,7 +63,7 @@ Los archivos del prototipo anterior siguen recuperables en Git y algunos permane
 
 ## Banners y reportes
 
-Hasta 20 banners por sitio, PNG/JPG/WebP de hasta 1 MB; orden, título, vista previa, edición, estado y eliminación. Se guardan como datos del panel, sin publicar hacia otras plataformas. Reportes y resumen muestran cuentas del alcance autorizado; no contienen datos económicos. La actividad conserva los últimos 2.000 eventos por sitio y muestra los 100 más recientes.
+Hasta 20 banners por sitio, PNG/JPG/WebP de hasta 1 MB; orden, título, vista previa, edición, estado y eliminación. Se guardan como datos del panel, sin publicar hacia otras plataformas. Estadísticas, Reportes Globales y Mi resumen muestran cuentas del alcance autorizado. Reportes de Fichas, Reportes de Juegos y Finanzas recuperan sus formularios base y muestran explícitamente que aún no tienen una fuente de datos conectada; no ejecutan operaciones ni inventan resultados. Torneos y Chat Soporte muestran Pronto; Categorías muestra su estado vacío. La actividad conserva los últimos 2.000 eventos por sitio y muestra los 100 más recientes.
 
 ## Verificación
 
@@ -74,3 +74,9 @@ Ver `QA.md` para las comprobaciones visuales y sus límites.
 ## Recursos visuales
 
 Diseño prioritario para celular, contrastado con la referencia a 393 px de ancho. Las fuentes y los iconos se sirven desde el propio proyecto: Roboto (`roboto-fontface` 0.10.0) y Font Awesome Free 5.7.0. Sus licencias acompañan los archivos en `management/public/fonts/`. No requieren conexión con el sitio de referencia ni un CDN. La adaptación de escritorio queda como base para una revisión posterior.
+
+## Corrección de ingreso y permisos (14/10/2026)
+
+El ingreso móvil recupera la composición gris original, sin subtítulo añadido, con iconos de usuario y candado, etiquetas flotantes y encabezado azul. Medido contra la referencia a 393 × 660: tarjeta 363 × 319,27 px, encabezado 323 × 89,60 px y botón 147,66 × 54,56 px. El layout se centra en el alto visible, sin dibujar barras del navegador.
+
+`management/permissions.js` define la misma distribución para la API y la interfaz. Super Master tiene todas las secciones del Master y añade solamente Nuevo sitio y Sitios. Los agentes y subagentes reciben las seis secciones reducidas indicadas arriba. Se conserva la restricción de creación: Super Master → Masters; Master y agentes → agentes.

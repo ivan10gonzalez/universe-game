@@ -1,3 +1,4 @@
+import { sectionsFor, canOpenSection } from '/management-permissions.js';
 (() => {
   'use strict';
   const $ = s => document.querySelector(s);
@@ -22,11 +23,12 @@
   }
   function currentSite() { return sites.find(s => s.id === siteId); }
   function renderNav() {
-    const items = [['users', 'Usuarios', '\uf4fe'], ['reports', 'Reportes globales', '\uf5dc'], ['summary', 'Mi resumen', '\uf571']];
-    if (me.role !== 'agent') items.push(['banners', 'Banners e imágenes', '\uf03e'], ['activity', 'Registro de actividad', '\uf1da'], ['settings', 'Settings', '\uf013'], ['support', 'Soporte', '\uf0e0']);
-    if (me.role === 'super') items.push(['sites', 'Sitios', '\uf0ac']);
-    $('#navigation').innerHTML = items.map(([key, label, icon]) => `<button data-view="${key}" class="${view === key ? 'active ' : ''}${key === 'sites' ? 'sites-link' : ''}" ${view === key ? 'aria-current="page"' : ''}><span class="fa" aria-hidden="true">${icon}</span>${label}<span class="fa nav-chevron" aria-hidden="true">&#xf105;</span></button>`).join('');
-    $('#navigation').querySelectorAll('button').forEach(button => button.addEventListener('click', () => { closeDrawer(); openView(button.dataset.view); }));
+    const items = sectionsFor(me.role);
+    $('#navigation').innerHTML = items.map(({id: key, label, icon}) => `<button data-view="${key}" class="${view === key ? 'active ' : ''}${key === 'sites' ? 'sites-link' : key === 'new-site' ? 'new-site-link' : ''}" ${view === key ? 'aria-current="page"' : ''}><span class="fa" aria-hidden="true">${icon}</span>${label}<span class="fa nav-chevron" aria-hidden="true">&#xf105;</span></button>`).join('');
+    $('#navigation').querySelectorAll('button').forEach(button => button.addEventListener('click', () => {
+      closeDrawer();
+      if (button.dataset.view === 'new-site') newSitePreview(); else openView(button.dataset.view);
+    }));
     $('#account-name').textContent = me.username;
     $('#identity').textContent = `${me.username} · ${roles[me.role]}`;
     $('#selected-site').textContent = currentSite()?.name || 'Seleccioná un sitio';
@@ -68,6 +70,10 @@
   });
   const passwordInput = (label, name = 'password', autocomplete = 'new-password') => `<label>${label}<input name="${name}" type="password" autocomplete="${autocomplete}" ${autocomplete === 'new-password' ? 'minlength="12"' : ''} maxlength="128" required></label>`;
   function heading(title, subtitle = '', action = '') { return `<div class="page-heading"><div><h1>${e(title)}</h1>${subtitle ? `<p>${e(subtitle)}</p>` : ''}</div>${action}</div>`; }
+  function newSitePreview() {
+    if (me?.role !== 'super') return;
+    openDialog('Nuevo sitio', '<p>Elegí el diseño de la nueva plataforma.</p><div class="site-designs"><button type="button" disabled>Panel blanco</button><button type="button" disabled>Panel violeta</button><button type="button" disabled>Original</button></div><p class="muted">Próximamente. Estas opciones todavía no crean sitios ni plataformas.</p>', null);
+  }
   function selectSite(id) {
     if (!sites.some(s => s.id === id)) return; dialog.close(); siteId = id;
     try { sessionStorage.setItem(`management-site:${me.id}`, id); } catch { /* No persistence required. */ }
@@ -75,6 +81,7 @@
   }
   async function openView(next) {
     if (!me) return;
+    if (!canOpenSection(me.role, next)) { notify('No tenés acceso a esta sección.'); return; }
     view = next; renderNav(); const generation = ++version, scoped = siteId;
     const active = () => generation === version && me;
     $('#content').innerHTML = '<p class="loading" role="status">Cargando…</p>';
@@ -82,10 +89,8 @@
       if (next === 'sites') {
         if (me.role !== 'super') throw new Error('Acceso exclusivo del Super Master.');
         const data = await api('/api/management/me'); if (!active()) return; sites = data.sites;
-        $('#content').innerHTML = heading('Sitios', 'Elegí el sitio sobre el que querés trabajar.', '<button id="create-site" class="red">+ NUEVO SITIO</button>') + (sites.length ? `<div class="site-grid">${sites.map(s => `<article class="card site-card ${s.id === siteId ? 'selected' : ''}"><h2>${e(s.name)}</h2><p class="muted">Interfaz Base · Gestión de cuentas y contenidos</p><button data-select-site="${e(s.id)}">${s.id === siteId ? 'SITIO SELECCIONADO' : 'ADMINISTRAR SITIO'}</button><code>${e(s.id)}</code></article>`).join('')}</div>` : '<section class="card empty">Todavía no hay sitios.<br>Creá el primero y después asignale una cuenta Master.</section>');
-        $('#create-site').addEventListener('click', () => openDialog('Nuevo sitio', '<label>Nombre del sitio<input name="name" maxlength="80" required placeholder="Ejemplo: Mi sitio"></label><p class="muted">Después de crearlo, podrás crear su Master desde Usuarios.</p>', async fields => {
-          const result = await api('/api/management/sites', 'POST', { name: fields.get('name') }); sites.push(result.site); selectSite(result.site.id); notify('Sitio creado. Ahora podés crear su Master.');
-        }));
+        $('#content').innerHTML = heading('Sitios', 'Elegí el sitio sobre el que querés trabajar.', '<button id="create-site" class="red">+ NUEVO SITIO</button>') + (sites.length ? `<div class="site-grid">${sites.map(s => `<article class="card site-card ${s.id === siteId ? 'selected' : ''}"><h2>${e(s.name)}</h2><p class="muted">Interfaz Base · Gestión de cuentas y contenidos</p><button data-select-site="${e(s.id)}">${s.id === siteId ? 'SITIO SELECCIONADO' : 'ADMINISTRAR SITIO'}</button><code>${e(s.id)}</code></article>`).join('')}</div>` : '<section class="card empty">Todavía no hay sitios.<br>La creación de nuevas plataformas estará disponible próximamente.</section>');
+        $('#create-site').addEventListener('click', newSitePreview);
         $('#content').querySelectorAll('[data-select-site]').forEach(button => button.addEventListener('click', () => selectSite(button.dataset.selectSite)));
         return;
       }
@@ -97,7 +102,7 @@
         $('#content').innerHTML = `<h1 class="sr-only">Usuarios de ${e(siteName)}</h1><div class="user-toolbar"><button class="red" id="create-user"><span class="fa" aria-hidden="true">&#xf234;</span> NUEVO ${isSuper ? 'MASTER' : 'AGENTE'}</button><button class="red" id="structure">ESTRUCTURA</button></div><section class="card users-card"><form class="search" id="user-search-form"><label class="sr-only" for="user-search">Nombre de usuario</label><input id="user-search" type="search" placeholder="Nombre de usuario"><button>BUSCAR</button></form><div class="tabs user-filters" aria-label="Filtrar cuentas"><button type="button" data-role="all" class="selected" aria-pressed="true">TODOS</button><button type="button" data-role="master" aria-pressed="false">MASTERS</button><button type="button" data-role="agent" aria-pressed="false">AGENTES</button></div><div class="table-wrap"><table class="users"><thead><tr><th>Nombre de Usuario</th><th>Rol</th><th class="parent-column">Responsable</th><th>Acciones</th></tr></thead><tbody id="user-rows"></tbody></table></div><p class="count" id="user-count"></p></section>`;
         let roleFilter = 'all';
         const actor = me;
-        const canReset = u => u.id !== actor.id && (isSuper ? u.role === 'master' : u.role === 'agent');
+        const canReset = u => u.id !== actor.id && (isSuper ? ['master', 'agent'].includes(u.role) : u.role === 'agent');
         function paintUsers() {
           const needle = $('#user-search').value.trim().toLowerCase(), filtered = list.filter(u => u.username.toLowerCase().includes(needle) && (roleFilter === 'all' || u.role === roleFilter));
           $('#user-rows').innerHTML = filtered.map(u => `<tr><td class="username">${e(u.username)}</td><td><span class="role ${e(u.role)}">${roles[u.role]}</span></td><td class="parent-column">${e(list.find(p => p.id === u.parentId)?.username || (u.role === 'master' ? 'Super Master' : '—'))}</td><td class="table-actions">${canReset(u) ? `<button data-reset="${e(u.id)}" aria-label="Restablecer contraseña de ${e(u.username)}" title="Restablecer contraseña"><span class="fa" aria-hidden="true">&#xf084;</span></button>` : '—'}</td></tr>`).join('') || '<tr><td colspan="4" class="empty">No hay cuentas para mostrar.</td></tr>';
@@ -132,9 +137,24 @@
           openDialog('Estructura de cuentas', `<p>${e(siteName)}</p><ul class="tree">${roots.map(u => `<li>${e(u.username)} <small>· ${roles[u.role]}</small><ul>${branch(u.id)}</ul></li>`).join('') || '<li>No hay cuentas.</li>'}</ul>`, null);
         }); return;
       }
-      if (next === 'summary' || next === 'reports') {
+      if (next === 'summary' || next === 'reports' || next === 'statistics') {
         const result = await api(route(scoped, 'summary')); if (!active()) return;
-        $('#content').innerHTML = heading(next === 'summary' ? 'Mi resumen' : 'Reportes globales', `${siteName} · Información de tu alcance`) + `<div class="summary-grid"><article class="metric"><small>Cuentas visibles</small><strong>${result.accounts}</strong></article><article class="metric"><small>Agentes</small><strong>${result.agents}</strong></article><article class="metric"><small>Dependientes directos</small><strong>${result.directChildren}</strong></article></div><section class="card"><p class="muted">${me.role === 'agent' ? 'Este resumen incluye tu cuenta y los agentes que dependen de ella.' : 'Este resumen corresponde exclusivamente al sitio seleccionado.'}</p></section>`; return;
+        $('#content').innerHTML = heading(next === 'summary' ? 'Mi resumen' : next === 'statistics' ? 'Estadísticas' : 'Reportes Globales', `${siteName} · Información de tu alcance`) + `<div class="summary-grid"><article class="metric"><small>Cuentas visibles</small><strong>${result.accounts}</strong></article><article class="metric"><small>Agentes</small><strong>${result.agents}</strong></article><article class="metric"><small>Dependientes directos</small><strong>${result.directChildren}</strong></article></div><section class="card"><p class="muted">${me.role === 'agent' ? 'Este resumen incluye tu cuenta y los agentes que dependen de ella.' : 'Este resumen corresponde exclusivamente al sitio seleccionado.'}</p></section>`; return;
+      }
+      if (['chips', 'games', 'finance'].includes(next)) {
+        await api(route(scoped, 'sections/' + next)); if (!active()) return;
+        const title = sectionsFor(me.role).find(item => item.id === next).label;
+        const columns = next === 'chips' ? ['Fecha', 'Usuario', 'Movimiento', 'Fichas'] : next === 'games' ? ['Fecha', 'Usuario', 'Juego', 'Resultado'] : ['Fecha', 'Concepto', 'Importe'];
+        $('#content').innerHTML = heading(title, siteName) + `<section class="card"><form id="report-form" class="report-form"><div class="report-dates"><label>Fecha inicial<input type="date" name="start"></label><label>Fecha final<input type="date" name="end"></label></div><label>Nombre de usuario<input name="username" maxlength="50"></label><button>BUSCAR</button></form><div class="table-wrap"><table class="users"><thead><tr>${columns.map(title => `<th>${e(title)}</th>`).join('')}</tr></thead></table></div><p class="empty" id="report-status" role="status">Sin datos: esta sección todavía no tiene una fuente de actividad conectada.</p></section>`;
+        $('#report-form').addEventListener('submit', event => {
+          event.preventDefault(); const form = event.currentTarget;
+          $('#report-status').textContent = form.elements.start.value && form.elements.end.value && form.elements.start.value > form.elements.end.value ? 'La fecha final debe ser posterior a la inicial.' : 'Sin datos: esta sección todavía no tiene una fuente de actividad conectada.';
+        }); return;
+      }
+      if (['tournaments', 'categories', 'chat'].includes(next)) {
+        await api(route(scoped, 'sections/' + next)); if (!active()) return;
+        const title = sectionsFor(me.role).find(item => item.id === next).label;
+        $('#content').innerHTML = heading(title, siteName) + `<section class="card empty">${next === 'categories' ? 'No hay categorías configuradas.' : 'Pronto.'}</section>`; return;
       }
       if (next === 'banners') {
         const result = await api(route(scoped, 'banners')); if (!active()) return;

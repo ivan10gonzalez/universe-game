@@ -73,6 +73,24 @@ test('Roles, hierarchy, tenant boundaries and persistence', async t => {
     for (const section of ['banners', 'settings', 'activity']) assert.equal((await request(app, base(siteA) + '/' + section, { cookie: agent.cookie })).status, 403);
     assert.equal((await request(app, base(siteA) + '/settings', { method: 'PATCH', cookie: agent.cookie, body: { name: 'Bad' } })).status, 403);
   });
+  await t.test('Master and Super Master share full sections; agents have exactly the reduced menu', async () => {
+    const mine = async actor => (await request(app, '/api/management/me', { cookie: actor.cookie })).data.sections.map(item => item.id);
+    const agentSections = ['users', 'reports', 'chips', 'games', 'finance', 'summary'];
+    assert.deepEqual(await mine(agent), agentSections);
+    assert.deepEqual(await mine(child), agentSections);
+    const full = await mine(masterA), top = await mine(root);
+    assert.deepEqual(top, [...full, 'new-site', 'sites']);
+    for (const section of ['statistics', 'banners', 'tournaments', 'categories', 'chat', 'activity', 'settings', 'support']) {
+      assert.ok(full.includes(section));
+      assert.equal((await request(app, base(siteA) + '/sections/' + section, { cookie: agent.cookie })).status, 403);
+      for (const actor of [root, masterA]) assert.equal((await request(app, base(siteA) + '/sections/' + section, { cookie: actor.cookie })).status, 200);
+    }
+    for (const section of ['chips', 'games', 'finance']) {
+      const report = await request(app, base(siteA) + '/sections/' + section, { cookie: agent.cookie });
+      assert.equal(report.status, 200); assert.equal(report.data.status, 'not_connected'); assert.deepEqual(report.data.entries, []);
+      assert.equal((await request(app, base(siteB) + '/sections/' + section, { cookie: agent.cookie })).status, 403);
+    }
+  });
   let bannerA;
   await t.test('Banners and settings stay within the selected site', async () => {
     const a = await request(app, base(siteA) + '/banners', { method: 'POST', cookie: masterA.cookie, body: { title: 'Imagen A', image, order: 1, active: true } }); assert.equal(a.status, 201); bannerA = a.data.banner.id;
@@ -89,7 +107,9 @@ test('Roles, hierarchy, tenant boundaries and persistence', async t => {
     assert.equal((await request(app, base(siteA) + `/users/${child.user.id}/password`, { method: 'POST', cookie: agent.cookie, body: { password: 'NuevaClave2026!' } })).status, 200);
     assert.equal((await request(app, '/api/management/me', { cookie: child.cookie })).status, 401);
     child = await login(app, 'childA', 'NuevaClave2026!');
-    assert.equal((await request(app, base(siteA) + `/users/${agent.user.id}/password`, { method: 'POST', cookie: root.cookie, body: { password } })).status, 403);
+    assert.equal((await request(app, base(siteA) + `/users/${agent.user.id}/password`, { method: 'POST', cookie: root.cookie, body: { password } })).status, 200);
+    assert.equal((await request(app, '/api/management/me', { cookie: agent.cookie })).status, 401);
+    agent = await login(app, 'agentA');
     assert.equal((await request(app, base(siteA) + `/users/${masterA.user.id}/password`, { method: 'POST', cookie: root.cookie, body: { password: 'MasterNuevo2026!' } })).status, 200);
     assert.equal((await request(app, '/api/management/me', { cookie: masterA.cookie })).status, 401); masterA = await login(app, 'masterA', 'MasterNuevo2026!');
   });

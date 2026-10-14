@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { sectionsFor, canOpenSection } from './permissions.js';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
@@ -142,6 +143,10 @@ export function createManagementApp({ dataDir, bootstrapPassword, secureCookies 
     try {
       const url = new URL(req.url, 'http://localhost'), route = decodeURIComponent(url.pathname), method = req.method;
       if (method === 'GET' && route === '/api/health') return json(res, 200, { ok: true, service: 'site-management', version: 1 });
+      if (['GET', 'HEAD'].includes(method) && route === '/management-permissions.js') {
+        res.writeHead(200, { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'no-store' });
+        return res.end(method === 'HEAD' ? undefined : fs.readFileSync(path.join(publicDir, '../permissions.js')));
+      }
       const fonts = ['Roboto-Light.woff2', 'Roboto-Regular.woff2', 'Roboto-Medium.woff2', 'fa-solid-900.woff2'];
       if (['GET', 'HEAD'].includes(method) && fonts.some(name => route === '/fonts/' + name)) {
         res.writeHead(200, { 'Content-Type': 'font/woff2', 'Cache-Control': 'public, max-age=86400' });
@@ -175,7 +180,7 @@ export function createManagementApp({ dataDir, bootstrapPassword, secureCookies 
         res.setHeader('Set-Cookie', cookie(req, token)); return json(res, 200, { user: safeUser(user) });
       }
       const auth = session(req); if (!auth) fail(401, 'Ingresá para continuar.'); const actor = auth.user;
-      if (route === '/api/management/me' && method === 'GET') return json(res, 200, { user: safeUser(actor), sites: db.sites.filter(s => actor.role === 'super' || s.id === actor.siteId) });
+      if (route === '/api/management/me' && method === 'GET') return json(res, 200, { user: safeUser(actor), sections: sectionsFor(actor.role), sites: db.sites.filter(s => actor.role === 'super' || s.id === actor.siteId) });
       if (route === '/api/management/logins' && method === 'GET') return json(res, 200, { entries: db.audit.filter(e => e.actorId === actor.id && e.action === 'Ingreso a la cuenta').slice(-50).reverse().map(e => e.at) });
       if (route === '/api/management/logout' && method === 'POST') { sessions.delete(auth.key); res.setHeader('Set-Cookie', cookie(req, '', 0)); return json(res, 200, { ok: true }); }
       if (route === '/api/management/password' && method === 'POST') {
@@ -190,6 +195,13 @@ export function createManagementApp({ dataDir, bootstrapPassword, secureCookies 
         if (db.sites.some(s => s.name.toLowerCase() === name.toLowerCase())) fail(409, 'Ya existe un sitio con ese nombre.');
         const site = { id: id(), name, interface: 'base', createdAt: now() };
         transact(actor, site.id, 'Creación de sitio', site.id, next => next.sites.push(site)); return json(res, 201, { site });
+      }
+      const sectionMatch = /^\/api\/management\/sites\/([^/]+)\/sections\/([^/]+)$/.exec(route);
+      if (sectionMatch && method === 'GET') {
+        const [, siteId, section] = sectionMatch;
+        scopedSite(actor, siteId);
+        if (!canOpenSection(actor.role, section) || ['sites', 'new-site'].includes(section)) fail(403, 'No tenés acceso a esta sección.');
+        return json(res, 200, { section, status: ['chips', 'games', 'finance'].includes(section) ? 'not_connected' : 'coming_soon', entries: [] });
       }
       const match = /^\/api\/management\/sites\/([^/]+)\/(users|banners|settings|summary|activity)(?:\/([^/]+)(?:\/(password))?)?$/.exec(route);
       if (!match) fail(404, 'Ruta no encontrada.');
@@ -207,7 +219,7 @@ export function createManagementApp({ dataDir, bootstrapPassword, secureCookies 
       }
       if (section === 'users' && targetId && operation === 'password' && method === 'POST') {
         const target = db.users.find(u => u.id === targetId && u.siteId === siteId);
-        const allowed = target && target.id !== actor.id && (actor.role === 'super' ? target.role === 'master' : target.role === 'agent' && (actor.role === 'master' || descendant(target, actor)));
+        const allowed = target && target.id !== actor.id && (actor.role === 'super' ? ['master', 'agent'].includes(target.role) : target.role === 'agent' && (actor.role === 'master' || descendant(target, actor)));
         if (!allowed) fail(403, 'No podés restablecer esta cuenta.');
         const input = await readBody(req); const secret = password(input.password);
         transact(actor, siteId, 'Restablecimiento de contraseña', target.id, next => { next.users.find(u => u.id === target.id).passwordHash = hash(secret); });
