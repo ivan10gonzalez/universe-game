@@ -26,3 +26,11 @@ Comprobación en navegador a 393 × 852: fuentes cargadas, sin desbordamiento ho
 - Comparación del ingreso a 393 × 660: tarjeta de referencia (15;185,37), 363 × 319,26; local (15;185,36), 363 × 319,27. Campos y botón coinciden en posición; diferencias de redondeo inferiores a 0,02 px. Fondo por composición de #444 y rgba(62,69,81,.7), tarjeta rgba(229,228,255,.2).
 - Nuevo sitio muestra únicamente Panel blanco, Panel violeta y Original deshabilitados; no tiene envío ni llamada de creación.
 - Los informes sin datos conectados se identifican como tales; Torneos y Chat Soporte mantienen su estado Pronto.
+
+## Inicio y creación de usuarios (revisión posterior)
+
+- 13 pruebas aprobadas. Se añadieron jugadores creados por Master, agente y subagente; validación de datos personales y preferencias; persistencia tras reinicio; aislamiento por ramas y rechazo de creación administrativa por jugadores.
+- Super Master no puede crear jugadores ni agentes normales, solo Masters, incluso manipulando la API.
+- Inicio móvil en navegador a 393 × 852: sin rótulo Sitio seleccionado en Master, Netwin mensual y diario en cero, sin desbordamiento horizontal y navegación Usuarios → Nuevo usuario.
+- Pestañas verificadas: Jugador/Agente, Ingreso, Datos personales, Permisos y Comisiones de agente. El dato de prueba del nombre persiste al cambiar de pestaña; se canceló sin crear una cuenta por navegador.
+- Se inspeccionaron todas las pestañas del formulario del sitio de referencia, sin enviarlo ni modificar sus cuentas. Los proveedores de la referencia no se copian a la configuración local.

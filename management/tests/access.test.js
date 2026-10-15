@@ -75,12 +75,12 @@ test('Roles, hierarchy, tenant boundaries and persistence', async t => {
   });
   await t.test('Master and Super Master share full sections; agents have exactly the reduced menu', async () => {
     const mine = async actor => (await request(app, '/api/management/me', { cookie: actor.cookie })).data.sections.map(item => item.id);
-    const agentSections = ['users', 'reports', 'chips', 'games', 'finance', 'summary'];
+    const agentSections = ['statistics', 'users', 'reports', 'chips', 'games', 'finance', 'summary'];
     assert.deepEqual(await mine(agent), agentSections);
     assert.deepEqual(await mine(child), agentSections);
     const full = await mine(masterA), top = await mine(root);
     assert.deepEqual(top, [...full, 'new-site', 'sites']);
-    for (const section of ['statistics', 'banners', 'tournaments', 'categories', 'chat', 'activity', 'settings', 'support']) {
+    for (const section of ['banners', 'tournaments', 'categories', 'chat', 'activity', 'settings', 'support']) {
       assert.ok(full.includes(section));
       assert.equal((await request(app, base(siteA) + '/sections/' + section, { cookie: agent.cookie })).status, 403);
       for (const actor of [root, masterA]) assert.equal((await request(app, base(siteA) + '/sections/' + section, { cookie: actor.cookie })).status, 200);
@@ -150,4 +150,43 @@ test('Migration copies only administrative identities and leaves legacy bytes un
   const stored = fs.readFileSync(path.join(directory, 'management.json'), 'utf8');
   for (const term of ['oldPlayer', 'balance', 'OLD BANNER', 'balanceMovements']) assert.ok(!stored.includes(term));
   assert.equal(fs.readFileSync(path.join(directory, 'universe.json'), 'utf8'), original);
+});
+
+
+test('Player creation, personal data and permissions remain inside the account tree', async t => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'management-players-')); t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  let app = createManagementApp({ dataDir: directory, bootstrapPassword: rootPassword });
+  const root = await login(app, 'super_master', rootPassword), master = await login(app, 'universe_admin', 'UniverseAdmin2026!');
+  const site = master.user.siteId;
+  async function create(actor, name, role, extra = {}) {
+    return request(app, base(site) + '/users', { method: 'POST', cookie: actor.cookie, body: { username: name, password, role, ...extra } });
+  }
+  for (const role of ['player', 'agent']) assert.equal((await create(root, 'forbidden_' + role, role)).status, 403);
+  assert.equal((await create(master, 'parent_agent', 'agent', { commissionPeriod: 'weekly' })).status, 201);
+  const agent = await login(app, 'parent_agent');
+  assert.equal((await create(agent, 'child_agent', 'agent')).status, 201);
+  const child = await login(app, 'child_agent');
+  assert.equal((await create(master, 'sibling_agent', 'agent')).status, 201);
+  const sibling = await login(app, 'sibling_agent');
+  const profile = { fullName: 'Persona de prueba', document: 'DEMO', email: 'demo@example.com', phone: '000000' };
+  for (const [actor, name] of [[master,'player_master'], [agent,'player_agent'], [child,'player_child']]) {
+    const created = await create(actor, name, 'player', { profile });
+    assert.equal(created.status, 201); assert.equal(created.data.user.role, 'player'); assert.equal(created.data.user.parentId, actor.user.id); assert.deepEqual(created.data.user.profile, profile);
+  }
+  const player = await login(app, 'player_child');
+  assert.deepEqual((await request(app, '/api/management/me', { cookie: player.cookie })).data.sections, []);
+  for (const section of ['users', 'summary', 'settings', 'activity', 'banners', 'sections/statistics']) assert.equal((await request(app, base(site) + '/' + section, { cookie: player.cookie })).status, 403);
+  assert.equal((await create(player, 'illegal_agent', 'agent')).status, 403);
+  assert.equal((await create(child, 'illegal_master', 'master')).status, 403);
+  assert.equal((await create(agent, 'bad_email', 'player', { profile: { email: 'incorrecto' } })).status, 400);
+  assert.equal((await create(agent, 'bad_commission', 'player', { commissionPeriod: 'weekly' })).status, 400);
+  const players = (await request(app, base(site) + '/users', { cookie: agent.cookie })).data.users;
+  assert.deepEqual(players.filter(u => u.role === 'player').map(u => u.username).sort(), ['player_agent', 'player_child']);
+  const resetUrl = base(site) + '/users/' + player.user.id + '/password';
+  assert.equal((await request(app, resetUrl, { method: 'POST', cookie: sibling.cookie, body: { password } })).status, 403);
+  assert.equal((await request(app, resetUrl, { method: 'POST', cookie: child.cookie, body: { password: 'JugadorNuevo2026!' } })).status, 200);
+  assert.equal((await request(app, '/api/management/me', { cookie: player.cookie })).status, 401);
+  app = createManagementApp({ dataDir: directory, bootstrapPassword: rootPassword });
+  const persisted = await login(app, 'player_child', 'JugadorNuevo2026!'); assert.deepEqual(persisted.user.profile, profile);
+  assert.equal((await login(app, 'parent_agent')).user.commissionPeriod, 'weekly');
 });

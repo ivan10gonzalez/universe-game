@@ -3,7 +3,7 @@ import { sectionsFor, canOpenSection } from '/management-permissions.js';
   'use strict';
   const $ = s => document.querySelector(s);
   const e = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const roles = { super: 'Super Master', master: 'Master', agent: 'Agente' };
+  const roles = { super: 'Super Master', master: 'Master', agent: 'Agente', player: 'Jugador' };
   let me = null, sites = [], siteId = null, view = 'users', version = 0, onSubmit = null, toastTimer;
   const route = (site, section) => `/api/management/sites/${encodeURIComponent(site)}/${section}`;
   async function api(url, method = 'GET', data) {
@@ -31,6 +31,7 @@ import { sectionsFor, canOpenSection } from '/management-permissions.js';
     }));
     $('#account-name').textContent = me.username;
     $('#identity').textContent = `${me.username} · ${roles[me.role]}`;
+    $('.site-label').hidden = me.role !== 'super';
     $('#selected-site').textContent = currentSite()?.name || 'Seleccioná un sitio';
   }
   async function loadSession() {
@@ -38,7 +39,14 @@ import { sectionsFor, canOpenSection } from '/management-permissions.js';
     let remembered = null; try { remembered = sessionStorage.getItem(`management-site:${me.id}`); } catch { /* Storage can be disabled. */ }
     siteId = me.role === 'super' ? (sites.some(s => s.id === remembered) ? remembered : null) : me.siteId;
     $('#login-view').hidden = true; $('#panel').hidden = false;
-    await openView(me.role === 'super' && !siteId ? 'sites' : 'users');
+    $('#account-name').textContent = me.username;
+    if (me.role === 'player') {
+      $('.site-label').hidden = true; $('#menu-button').hidden = true; $('#navigation').replaceChildren();
+      $('#content').innerHTML = heading('Mi cuenta') + `<section class="card"><p>Usuario: <strong>${e(me.username)}</strong></p><p class="muted">Cuenta de jugador creada. La plataforma de juegos no está conectada a este panel todavía.</p></section>`;
+      return;
+    }
+    $('#menu-button').hidden = false;
+    await openView(me.role === 'super' && !siteId ? 'sites' : 'statistics');
   }
   $('#login-form').addEventListener('submit', async event => {
     event.preventDefault(); const form = event.currentTarget, button = form.querySelector('button'); button.disabled = true; button.classList.add('loading-button'); $('#login-error').textContent = '';
@@ -55,6 +63,8 @@ import { sectionsFor, canOpenSection } from '/management-permissions.js';
   document.addEventListener('keydown', event => { if (event.key === 'Escape') { closeDrawer(); $('#account-menu').hidden = true; $('#account-button').setAttribute('aria-expanded', 'false'); } });
   const dialog = $('#dialog');
   function openDialog(title, fields, callback, kind = '') {
+    dialog.querySelector('.user-role-tabs')?.remove();
+    $('#dialog-form').noValidate = false;
     dialog.className = kind;
     $('#dialog-title').textContent = title; $('#dialog-fields').innerHTML = fields; $('#dialog-error').textContent = ''; $('#dialog-submit').hidden = !callback; onSubmit = callback;
     dialog.showModal();
@@ -77,7 +87,70 @@ import { sectionsFor, canOpenSection } from '/management-permissions.js';
   function selectSite(id) {
     if (!sites.some(s => s.id === id)) return; dialog.close(); siteId = id;
     try { sessionStorage.setItem(`management-site:${me.id}`, id); } catch { /* No persistence required. */ }
-    openView('users');
+    openView('statistics');
+  }
+  function openUser(initial = 'player') {
+    const scoped = siteId;
+    if (!scoped) { notify('Primero seleccioná un sitio.'); return; }
+    const isSuper = me.role === 'super', available = isSuper ? ['master'] : ['player', 'agent'];
+    let chosen = available.includes(initial) ? initial : available[0], tab = 'login';
+    const drafts = Object.fromEntries(available.map(role => [role, { username: '', password: '', fullName: '', document: '', email: '', phone: '', commissionPeriod: 'monthly' }]));
+    function saveDraft() {
+      dialog.querySelectorAll('[data-draft]').forEach(input => { drafts[chosen][input.dataset.draft] = input.value; });
+    }
+    function renderForm() {
+      const draft = drafts[chosen];
+      $('#dialog-title').textContent = isSuper ? 'Nuevo Master' : 'Nuevo usuario';
+      const rolesBar = dialog.querySelector('.user-role-tabs');
+      rolesBar.innerHTML = available.map(role => `<button type="button" role="tab" aria-selected="${role === chosen}" data-create-role="${role}"><span class="fa" aria-hidden="true">&#xf234;</span> ${roles[role]}</button>`).join('');
+      rolesBar.querySelectorAll('button').forEach(button => button.addEventListener('click', () => { saveDraft(); chosen = button.dataset.createRole; tab = 'login'; renderForm(); }));
+      const tabs = [['login','Ingreso'], ['personal','Datos personales'], ['permissions','Permisos'], ...(chosen === 'agent' ? [['commissions','Comisiones']] : [])];
+      $('#dialog-fields').innerHTML = `<div class="user-form-tabs" role="tablist" aria-label="Datos de la cuenta">${tabs.map(([id,label]) => `<button type="button" role="tab" data-create-tab="${id}" aria-selected="${id === tab}" aria-controls="create-tab-content">${label}</button>`).join('')}</div><div id="create-tab-content" role="tabpanel" aria-label="${tabs.find(([id]) => id === tab)[1]}"></div>`;
+      const body = $('#create-tab-content');
+      function field(label, name, icon, type = 'text', max = 120) {
+        return `<label class="credential-label"><span class="fa field-icon" aria-hidden="true">${icon}</span><span class="floating-label">${label}</span><input aria-label="${label}" data-draft="${name}" name="${name}" type="${type}" value="${e(draft[name])}" maxlength="${max}" autocomplete="${name === 'password' ? 'new-password' : 'off'}"></label>`;
+      }
+      if (tab === 'login') body.innerHTML = `<div class="credential-fields">${field('Nombre de Usuario','username','&#xf007;','text',50)}${field('Contraseña','password','&#xf070;','password',128)}</div>`;
+      if (tab === 'personal') body.innerHTML = `<div class="credential-fields personal-fields">${field('Nombre completo','fullName','&#xf007;')}${field('Documento','document','&#xf2c2;','text',60)}${field('Email','email','&#xf0e0;','email',180)}${field('Teléfono','phone','&#xf3cd;','tel',40)}</div>`;
+      if (tab === 'permissions') body.innerHTML = '<div class="provider-permissions"><section><h3>Deportes</h3><p>No hay proveedores configurados.</p></section><section><h3>Casino</h3><p>No hay proveedores configurados.</p></section></div>';
+      if (tab === 'commissions') body.innerHTML = `<div class="commission-fields"><label>Liquidar automáticamente<select data-draft="commissionPeriod"><option value="monthly" ${draft.commissionPeriod === 'monthly' ? 'selected' : ''}>Mensual</option><option value="weekly" ${draft.commissionPeriod === 'weekly' ? 'selected' : ''}>Semanal</option></select></label><section><h3>Deportes</h3><p>No hay proveedores configurados.</p></section><section><h3>Casino</h3><p>No hay proveedores configurados.</p></section><p class="muted">Se guarda la preferencia. Todavía no se ejecutan liquidaciones.</p></div>`;
+      $('#dialog-fields').querySelectorAll('[data-create-tab]').forEach(button => button.addEventListener('click', () => { saveDraft(); tab = button.dataset.createTab; renderForm(); }));
+      if (tab === 'login') {
+        const input = body.querySelector('[name="password"]'), icon = input.closest('label').querySelector('.field-icon');
+        const toggle = document.createElement('button'); toggle.type = 'button'; toggle.className = 'password-toggle fa'; toggle.innerHTML = '&#xf070;'; toggle.setAttribute('aria-label','Mostrar contraseña'); toggle.setAttribute('aria-pressed','false'); icon.replaceWith(toggle);
+        toggle.addEventListener('click', () => { const show = input.type === 'password'; input.type = show ? 'text' : 'password'; toggle.innerHTML = show ? '&#xf06e;' : '&#xf070;'; toggle.setAttribute('aria-pressed',String(show)); toggle.setAttribute('aria-label',show ? 'Ocultar contraseña' : 'Mostrar contraseña'); });
+      }
+    }
+    openDialog(isSuper ? 'Nuevo Master' : 'Nuevo usuario', '', async () => {
+      saveDraft(); const draft = drafts[chosen];
+      if (!/^[a-zA-Z0-9_.-]{3,50}$/.test(draft.username) || draft.password.length < 12 || draft.password.length > 128) {
+        tab = 'login'; renderForm(); throw new Error('Completá un usuario de 3 a 50 caracteres y una contraseña de 12 a 128 caracteres.');
+      }
+      if (draft.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email)) { tab = 'personal'; renderForm(); throw new Error('Revisá el email.'); }
+      await api(route(scoped, 'users'), 'POST', { username: draft.username, password: draft.password, role: chosen, profile: { fullName: draft.fullName, document: draft.document, email: draft.email, phone: draft.phone }, ...(chosen === 'agent' ? { commissionPeriod: draft.commissionPeriod } : {}) });
+      notify('Cuenta creada correctamente.'); await openView('users');
+    }, 'account-create tabbed-create');
+    $('#dialog-form').noValidate = true;
+    const bar = document.createElement('div'); bar.className = 'user-role-tabs'; bar.setAttribute('role','tablist'); bar.setAttribute('aria-label','Tipo de cuenta'); dialog.querySelector('header').append(bar);
+    renderForm(); dialog.querySelector('[name="username"]').focus();
+  }
+  function zeroChart(title, labels) {
+    const left = 34, right = 320, bottom = 141, top = 18;
+    const x = i => left + i * (right - left) / Math.max(1, labels.length - 1);
+    const horizontal = [0, .25, .5, .75, 1].map(v => { const y = bottom - v * (bottom - top); return `<line x1="${left}" x2="${right}" y1="${y}" y2="${y}"/><text x="29" y="${y + 4}" text-anchor="end">${v.toLocaleString('es-AR')}</text>`; }).join('');
+    const vertical = labels.map((label,i) => `<line x1="${x(i)}" x2="${x(i)}" y1="${top}" y2="${bottom}"/><text transform="translate(${x(i)},153) rotate(-45)" text-anchor="end">${e(label)}</text>`).join('');
+    const dots = labels.map((_,i) => `<circle cx="${x(i)}" cy="${bottom}" r="3"/>`).join('');
+    return `<section class="card dashboard-card"><h2>${title}:</h2><svg class="zero-chart" viewBox="0 0 340 185" role="img" aria-label="${title}, todos los valores en cero"><g class="chart-grid">${horizontal}${vertical}</g><path class="chart-line" d="M${left} ${bottom}H${right}"/><g class="chart-dots">${dots}</g></svg></section>`;
+  }
+  function dashboard() {
+    const today = new Date(), months = Array.from({length:12},(_,i)=>new Date(today.getFullYear(),today.getMonth()-11+i,1).toLocaleDateString('es-AR',{month:'short',year:'2-digit'}));
+    const days = Array.from({length:today.getDate()},(_,i)=>String(i+1).padStart(2,'0'));
+    const isSuper = me.role === 'super';
+    $('#content').innerHTML = `<h1 class="sr-only">Estadísticas</h1><div class="dashboard"><section class="card dashboard-card quick-card"><h2>Carga rápida</h2><div class="quick-buttons">${isSuper ? '<button class="red" id="quick-master"><span class="fa" aria-hidden="true">&#xf0c0;</span> NUEVO MASTER</button>' : '<button class="red" id="quick-player"><span class="fa" aria-hidden="true">&#xf007;</span> NUEVO JUGADOR</button><button class="red" id="quick-agent"><span class="fa" aria-hidden="true">&#xf0c0;</span> NUEVO AGENTE</button>'}</div><div class="quick-search"><label class="sr-only" for="quick-username">Nombre de usuario</label><input id="quick-username" placeholder="Nombre de usuario" autocomplete="off"><button class="quick-action" data-quick="Cargar fichas" aria-label="Cargar fichas">+</button><button class="quick-action" data-quick="Retirar fichas" aria-label="Retirar fichas">−</button></div></section>${zeroChart('Netwin Mensual',months)}${zeroChart('Netwin Diario',days)}<section class="card dashboard-card top-agents"><h2>Top Agentes del mes</h2><p class="empty">Sin actividad registrada.</p></section></div>`;
+    $('#quick-master')?.addEventListener('click',()=>openUser('master'));
+    $('#quick-player')?.addEventListener('click',()=>openUser('player'));
+    $('#quick-agent')?.addEventListener('click',()=>openUser('agent'));
+    document.querySelectorAll('[data-quick]').forEach(button=>button.addEventListener('click',()=>openDialog(button.dataset.quick, `<p>${$('#quick-username').value.trim() ? 'Usuario: '+e($('#quick-username').value.trim()) : 'Seleccioná una cuenta desde Usuarios.'}</p><p>Los movimientos de fichas todavía no están conectados en este panel.</p>`,null)));
   }
   async function openView(next) {
     if (!me) return;
@@ -99,13 +172,13 @@ import { sectionsFor, canOpenSection } from '/management-permissions.js';
       if (next === 'users') {
         const data = await api(route(scoped, 'users')); if (!active()) return;
         const list = data.users, isSuper = me.role === 'super';
-        $('#content').innerHTML = `<h1 class="sr-only">Usuarios de ${e(siteName)}</h1><div class="user-toolbar"><button class="red" id="create-user"><span class="fa" aria-hidden="true">&#xf234;</span> NUEVO ${isSuper ? 'MASTER' : 'AGENTE'}</button><button class="red" id="structure">ESTRUCTURA</button></div><section class="card users-card"><form class="search" id="user-search-form"><label class="sr-only" for="user-search">Nombre de usuario</label><input id="user-search" type="search" placeholder="Nombre de usuario"><button>BUSCAR</button></form><div class="tabs user-filters" aria-label="Filtrar cuentas"><button type="button" data-role="all" class="selected" aria-pressed="true">TODOS</button><button type="button" data-role="master" aria-pressed="false">MASTERS</button><button type="button" data-role="agent" aria-pressed="false">AGENTES</button></div><div class="table-wrap"><table class="users"><thead><tr><th>Nombre de Usuario</th><th>Rol</th><th class="parent-column">Responsable</th><th>Acciones</th></tr></thead><tbody id="user-rows"></tbody></table></div><p class="count" id="user-count"></p></section>`;
+        $('#content').innerHTML = `<h1 class="sr-only">Usuarios de ${e(siteName)}</h1><div class="user-toolbar"><button class="red" id="create-user"><span class="fa" aria-hidden="true">&#xf234;</span> NUEVO ${isSuper ? 'MASTER' : 'USUARIO'}</button><button class="red" id="structure">ESTRUCTURA</button></div><section class="card users-card"><form class="search" id="user-search-form"><label class="sr-only" for="user-search">Nombre de usuario</label><input id="user-search" type="search" placeholder="Nombre de usuario"><button>BUSCAR</button></form><div class="tabs user-filters" aria-label="Filtrar cuentas"><button type="button" data-role="all" class="selected" aria-pressed="true">TODOS</button><button type="button" data-role="agent" aria-pressed="false">AGENTES</button><button type="button" data-role="player" aria-pressed="false">JUGADORES</button>${isSuper ? '<button type="button" data-role="master" aria-pressed="false">MASTERS</button>' : ''}</div><div class="table-wrap"><table class="users"><thead><tr><th>Nombre de Usuario</th><th>Rol</th><th class="parent-column">Responsable</th><th>Acciones</th></tr></thead><tbody id="user-rows"></tbody></table></div><p class="count" id="user-count"></p></section>`;
         let roleFilter = 'all';
         const actor = me;
-        const canReset = u => u.id !== actor.id && (isSuper ? ['master', 'agent'].includes(u.role) : u.role === 'agent');
+        const canReset = u => u.id !== actor.id && (isSuper ? ['master', 'agent', 'player'].includes(u.role) : ['agent', 'player'].includes(u.role));
         function paintUsers() {
           const needle = $('#user-search').value.trim().toLowerCase(), filtered = list.filter(u => u.username.toLowerCase().includes(needle) && (roleFilter === 'all' || u.role === roleFilter));
-          $('#user-rows').innerHTML = filtered.map(u => `<tr><td class="username">${e(u.username)}</td><td><span class="role ${e(u.role)}">${roles[u.role]}</span></td><td class="parent-column">${e(list.find(p => p.id === u.parentId)?.username || (u.role === 'master' ? 'Super Master' : '—'))}</td><td class="table-actions">${canReset(u) ? `<button data-reset="${e(u.id)}" aria-label="Restablecer contraseña de ${e(u.username)}" title="Restablecer contraseña"><span class="fa" aria-hidden="true">&#xf084;</span></button>` : '—'}</td></tr>`).join('') || '<tr><td colspan="4" class="empty">No hay cuentas para mostrar.</td></tr>';
+          $('#user-rows').innerHTML = filtered.map(u => `<tr><td class="username ${u.role === 'player' ? 'player-name' : ''}">${e(u.username)}</td><td><span class="role ${e(u.role)}">${roles[u.role]}</span></td><td class="parent-column">${e(list.find(p => p.id === u.parentId)?.username || (u.role === 'master' ? 'Super Master' : '—'))}</td><td class="table-actions">${canReset(u) ? `<button data-reset="${e(u.id)}" aria-label="Restablecer contraseña de ${e(u.username)}" title="Restablecer contraseña"><span class="fa" aria-hidden="true">&#xf084;</span></button>` : '—'}</td></tr>`).join('') || '<tr><td colspan="4" class="empty">No hay cuentas para mostrar.</td></tr>';
           $('#user-count').textContent = `${filtered.length} cuenta${filtered.length === 1 ? '' : 's'} en tu alcance`;
           $('#user-rows').querySelectorAll('[data-reset]').forEach(button => button.addEventListener('click', () => {
             const target = list.find(u => u.id === button.dataset.reset);
@@ -119,25 +192,15 @@ import { sectionsFor, canOpenSection } from '/management-permissions.js';
           document.querySelectorAll('[data-role]').forEach(item => { item.classList.toggle('selected', item === button); item.setAttribute('aria-pressed', String(item === button)); });
           paintUsers();
         }));
-        $('#create-user').addEventListener('click', () => {
-          openDialog(isSuper ? 'Master' : 'Agente', `<div class="create-tabs"><span>Ingreso</span></div><div class="credential-fields"><label class="credential-label"><span class="fa field-icon" aria-hidden="true">&#xf007;</span><span class="floating-label">Nombre de Usuario</span><input name="username" autocomplete="off" pattern="[a-zA-Z0-9_.-]{3,50}" minlength="3" maxlength="50" required></label><label class="credential-label"><button type="button" class="password-toggle fa" aria-label="Mostrar contraseña" aria-pressed="false">&#xf070;</button><span class="floating-label">Contraseña</span><input name="password" aria-label="Contraseña" type="password" autocomplete="new-password" minlength="12" maxlength="128" required></label></div><p class="create-note">${isSuper ? 'Master de ' + e(siteName) : 'Depende de ' + e(me.username) + ' · Puede crear subagentes'}</p>`, async fields => {
-            await api(route(scoped, 'users'), 'POST', { username: fields.get('username'), password: fields.get('password'), role: isSuper ? 'master' : 'agent' }); notify('Cuenta creada. Ya puede ingresar con esos datos.'); await openView('users');
-          }, 'account-create');
-          dialog.querySelector('[name="username"]').focus();
-          const toggle = dialog.querySelector('.password-toggle');
-          toggle.addEventListener('click', () => {
-            const input = dialog.querySelector('[name="password"]'), visible = input.type === 'password';
-            input.type = visible ? 'text' : 'password'; toggle.textContent = visible ? '\uf06e' : '\uf070';
-            toggle.setAttribute('aria-label', visible ? 'Ocultar contraseña' : 'Mostrar contraseña'); toggle.setAttribute('aria-pressed', String(visible));
-          });
-        });
+        $('#create-user').addEventListener('click', () => openUser(isSuper ? 'master' : 'player'));
         $('#structure').addEventListener('click', () => {
           function branch(parent, depth = 0) { if (depth > 100) return '<li>La estructura continúa.</li>'; return list.filter(u => u.parentId === parent).map(u => `<li>${e(u.username)} <small>· ${roles[u.role]}</small><ul>${branch(u.id, depth + 1)}</ul></li>`).join(''); }
           const roots = list.filter(u => !list.some(p => p.id === u.parentId));
           openDialog('Estructura de cuentas', `<p>${e(siteName)}</p><ul class="tree">${roots.map(u => `<li>${e(u.username)} <small>· ${roles[u.role]}</small><ul>${branch(u.id)}</ul></li>`).join('') || '<li>No hay cuentas.</li>'}</ul>`, null);
         }); return;
       }
-      if (next === 'summary' || next === 'reports' || next === 'statistics') {
+      if (next === 'statistics') { dashboard(); return; }
+      if (next === 'summary' || next === 'reports') {
         const result = await api(route(scoped, 'summary')); if (!active()) return;
         $('#content').innerHTML = heading(next === 'summary' ? 'Mi resumen' : next === 'statistics' ? 'Estadísticas' : 'Reportes Globales', `${siteName} · Información de tu alcance`) + `<div class="summary-grid"><article class="metric"><small>Cuentas visibles</small><strong>${result.accounts}</strong></article><article class="metric"><small>Agentes</small><strong>${result.agents}</strong></article><article class="metric"><small>Dependientes directos</small><strong>${result.directChildren}</strong></article></div><section class="card"><p class="muted">${me.role === 'agent' ? 'Este resumen incluye tu cuenta y los agentes que dependen de ella.' : 'Este resumen corresponde exclusivamente al sitio seleccionado.'}</p></section>`; return;
       }

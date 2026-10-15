@@ -18,7 +18,7 @@ const management = [
 ];
 export function sectionsFor(role) {
   if (!['super', 'master', 'agent'].includes(role)) return [];
-  const items = role === 'agent' ? [...basic] : [['statistics', 'Estadísticas', '\uf200'], ...basic, ...management];
+  const items = role === 'agent' ? [['statistics', 'Estadísticas', '\uf200'], ...basic] : [['statistics', 'Estadísticas', '\uf200'], ...basic, ...management];
   if (role === 'super') items.push(['new-site', 'Nuevo sitio', '\uf067'], ['sites', 'Sitios', '\uf0ac']);
   return items.map(([id, label, icon]) => ({ id, label, icon }));
 }

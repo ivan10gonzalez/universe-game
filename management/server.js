@@ -14,7 +14,7 @@ const verify = (password, stored) => {
   if (!/^[a-f0-9]{32}$/.test(salt || '') || !/^[a-f0-9]{128}$/.test(value || '')) return false;
   return crypto.timingSafeEqual(Buffer.from(value, 'hex'), Buffer.from(hash(password, salt).split(':')[1], 'hex'));
 };
-const safeUser = ({ id, username, role, siteId, parentId, createdAt }) => ({ id, username, role, siteId, parentId, createdAt });
+const safeUser = ({ id, username, role, siteId, parentId, createdAt, profile, commissionPeriod }) => ({ id, username, role, siteId, parentId, createdAt, ...(profile ? { profile } : {}), ...(commissionPeriod ? { commissionPeriod } : {}) });
 function text(value, name, max = 100) {
   if (typeof value !== 'string' || !value.trim() || value.trim().length > max) fail(400, `${name}: completá un valor de hasta ${max} caracteres.`);
   return value.trim();
@@ -49,7 +49,7 @@ function validateStore(db) {
   if (db.version !== 1 || !['users', 'sites', 'banners', 'audit'].every(key => Array.isArray(db[key]))) throw new Error('management.json inválido. No se reemplazó el archivo.');
   const ids = new Set(), names = new Set(), sites = new Set(db.sites.map(s => s.id));
   for (const user of db.users) {
-    if (!user.id || ids.has(user.id) || !['super', 'master', 'agent'].includes(user.role) || typeof user.username !== 'string' || names.has(user.username.toLowerCase()) || !/^[a-f0-9]{32}:[a-f0-9]{128}$/.test(user.passwordHash || '')) throw new Error('Cuentas de gestión inválidas.');
+    if (!user.id || ids.has(user.id) || !['super', 'master', 'agent', 'player'].includes(user.role) || typeof user.username !== 'string' || names.has(user.username.toLowerCase()) || !/^[a-f0-9]{32}:[a-f0-9]{128}$/.test(user.passwordHash || '')) throw new Error('Cuentas de gestión inválidas.');
     ids.add(user.id); names.add(user.username.toLowerCase());
     if (user.role !== 'super' && !sites.has(user.siteId)) throw new Error('Cuenta sin sitio válido.');
   }
@@ -58,10 +58,10 @@ function validateStore(db) {
     const seen = new Set([user.id]); let current = user;
     while (current.parentId) {
       const parent = db.users.find(u => u.id === current.parentId);
-      if (!parent || seen.has(parent.id) || parent.siteId !== user.siteId || parent.role === 'super') throw new Error('Jerarquía de cuentas inválida.');
+      if (!parent || seen.has(parent.id) || parent.siteId !== user.siteId || ['super', 'player'].includes(parent.role)) throw new Error('Jerarquía de cuentas inválida.');
       seen.add(parent.id); current = parent;
     }
-    if (user.role === 'agent' && current.role !== 'master') throw new Error('Agente sin Master.');
+    if (['agent', 'player'].includes(user.role) && current.role !== 'master') throw new Error('Agente sin Master.');
   }
 }
 export function createManagementApp({ dataDir, bootstrapPassword, secureCookies = false }) {
@@ -125,6 +125,7 @@ export function createManagementApp({ dataDir, bootstrapPassword, secureCookies 
     return db.users.filter(u => u.siteId === siteId && (actor.role !== 'agent' || u.id === actor.id || descendant(u, actor)));
   }
   function scopedSite(actor, siteId, onlyManagers = false) {
+    if (actor.role === 'player') fail(403, 'Esta cuenta de jugador no tiene acceso al panel administrativo.');
     if (actor.role !== 'super' && actor.siteId !== siteId) fail(403, 'No tenés acceso a este sitio.');
     if (onlyManagers && actor.role === 'agent') fail(403, 'Esta sección es exclusiva para Masters.');
     const site = db.sites.find(s => s.id === siteId); if (!site) fail(404, 'Sitio no encontrado.'); return site;
@@ -210,16 +211,26 @@ export function createManagementApp({ dataDir, bootstrapPassword, secureCookies 
       const site = scopedSite(actor, siteId, ['banners', 'settings', 'activity'].includes(section));
       if (section === 'users' && !targetId && method === 'GET') return json(res, 200, { users: visibleUsers(actor, siteId).map(safeUser) });
       if (section === 'users' && !targetId && method === 'POST') {
-        const input = await readBody(req); const role = actor.role === 'super' ? 'master' : 'agent';
-        if ((input.role && input.role !== role) || input.parentId !== undefined || input.siteId !== undefined || input.permissions !== undefined) fail(403, 'El rol, sitio y responsable los decide el servidor.');
+        const input = await readBody(req); const role = input.role || (actor.role === 'super' ? 'master' : 'agent');
+        const allowedRoles = actor.role === 'super' ? ['master'] : ['agent', 'player'];
+        if (!allowedRoles.includes(role) || input.parentId !== undefined || input.siteId !== undefined || input.permissions !== undefined) fail(403, 'El rol, sitio y responsable los decide el servidor.');
         const name = username(input.username), secret = password(input.password);
         if (db.users.some(u => u.username.toLowerCase() === name.toLowerCase())) fail(409, 'Ese nombre de usuario ya está en uso.');
-        const user = { id: id(), username: name, passwordHash: hash(secret), role, siteId, parentId: actor.role === 'super' ? null : actor.id, createdAt: now() };
-        transact(actor, siteId, `Creación de ${role === 'master' ? 'Master' : 'agente'}`, user.id, next => next.users.push(user)); return json(res, 201, { user: safeUser(user) });
+        const profile = {};
+        if (input.profile !== undefined && (!input.profile || typeof input.profile !== 'object' || Array.isArray(input.profile))) fail(400, 'Datos personales inválidos.');
+        for (const [key, max] of [['fullName', 120], ['document', 60], ['email', 180], ['phone', 40]]) {
+          const value = input.profile?.[key] ?? '';
+          if (typeof value !== 'string' || value.length > max) fail(400, 'Datos personales inválidos.');
+          profile[key] = value.trim();
+        }
+        if (profile.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profile.email)) fail(400, 'Email inválido.');
+        if (input.commissionPeriod !== undefined && (role !== 'agent' || !['monthly', 'weekly'].includes(input.commissionPeriod))) fail(400, 'Período de comisión inválido.');
+        const user = { id: id(), username: name, passwordHash: hash(secret), role, siteId, parentId: actor.role === 'super' ? null : actor.id, createdAt: now(), profile, ...(role === 'agent' ? { commissionPeriod: input.commissionPeriod || 'monthly' } : {}) };
+        transact(actor, siteId, `Creación de ${role === 'master' ? 'Master' : role === 'player' ? 'jugador' : 'agente'}`, user.id, next => next.users.push(user)); return json(res, 201, { user: safeUser(user) });
       }
       if (section === 'users' && targetId && operation === 'password' && method === 'POST') {
         const target = db.users.find(u => u.id === targetId && u.siteId === siteId);
-        const allowed = target && target.id !== actor.id && (actor.role === 'super' ? ['master', 'agent'].includes(target.role) : target.role === 'agent' && (actor.role === 'master' || descendant(target, actor)));
+        const allowed = target && target.id !== actor.id && (actor.role === 'super' ? ['master', 'agent', 'player'].includes(target.role) : ['agent', 'player'].includes(target.role) && (actor.role === 'master' || descendant(target, actor)));
         if (!allowed) fail(403, 'No podés restablecer esta cuenta.');
         const input = await readBody(req); const secret = password(input.password);
         transact(actor, siteId, 'Restablecimiento de contraseña', target.id, next => { next.users.find(u => u.id === target.id).passwordHash = hash(secret); });
@@ -227,7 +238,7 @@ export function createManagementApp({ dataDir, bootstrapPassword, secureCookies 
       }
       if (section === 'summary' && !targetId && method === 'GET') {
         const users = visibleUsers(actor, siteId);
-        return json(res, 200, { site, accounts: users.length, masters: users.filter(u => u.role === 'master').length, agents: users.filter(u => u.role === 'agent').length, directChildren: users.filter(u => u.parentId === actor.id).length });
+        return json(res, 200, { site, accounts: users.length, masters: users.filter(u => u.role === 'master').length, agents: users.filter(u => u.role === 'agent').length, players: users.filter(u => u.role === 'player').length, directChildren: users.filter(u => u.parentId === actor.id).length });
       }
       if (section === 'activity' && !targetId && method === 'GET') return json(res, 200, { events: db.audit.filter(e => e.siteId === siteId).slice(-100).reverse() });
       if (section === 'settings' && !targetId && method === 'GET') return json(res, 200, { site });

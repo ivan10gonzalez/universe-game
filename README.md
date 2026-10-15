@@ -16,8 +16,8 @@ Abrir `/` o `/admin` para ingresar. Las cuentas creadas desde Usuarios pueden in
 ## Jerarquía
 
 - **Super Master:** tiene **Sitios** al final del menú. Comparte todas las secciones del Master y puede seleccionar el sitio que administra. Crea únicamente cuentas Master y puede restablecer contraseñas de Masters y agentes del sitio seleccionado. «Nuevo sitio», justo encima de «Sitios», muestra Panel blanco, Panel violeta y Original: son opciones deshabilitadas de muestra y no crean plataformas.
-- **Master:** queda vinculado a un solo sitio. No tiene Sitios, no puede crear Masters y puede crear agentes. Administra los usuarios, banners, configuración y actividad de su propio sitio.
-- **Agente:** puede crear agentes debajo de su cuenta y estos pueden crear más subagentes. Ve únicamente su cuenta y descendientes. No accede a otras ramas, otros sitios, banners, configuración ni actividad general. Su menú contiene Usuarios, Reportes Globales, Reportes de Fichas, Reportes de Juegos, Finanzas y Mi resumen.
+- **Master:** queda vinculado a un solo sitio. No tiene Sitios, no puede crear Masters y puede crear agentes y jugadores. Administra los usuarios, banners, configuración y actividad de su propio sitio.
+- **Agente:** puede crear agentes debajo de su cuenta y estos pueden crear más subagentes. Ve únicamente su cuenta y descendientes. No accede a otras ramas, otros sitios, banners, configuración ni actividad general. Su menú contiene Estadísticas (inicio), Usuarios, Reportes Globales, Reportes de Fichas, Reportes de Juegos, Finanzas y Mi resumen.
 
 El servidor determina rol, sitio y responsable. Rechaza intentos de asignarlos libremente desde el navegador. Los Masters pueden restablecer contraseñas de agentes de su sitio; los agentes solo las de sus descendientes. Nadie puede usar ese mecanismo para cambiar las claves de superiores o de cuentas de otra rama. El cambio propio exige la contraseña actual.
 
@@ -26,8 +26,8 @@ El servidor determina rol, sitio y responsable. Rechaza intentos de asignarlos l
 1. Ingresar como `super_master`.
 2. Abrir el menú → **Sitios**. Seleccionar Universe u otro sitio existente. «Nuevo sitio» solo muestra los tres diseños previstos.
 3. Entrar a Usuarios → **Nuevo Master** y definir sus credenciales.
-4. Salir e ingresar como ese Master. Aparece **Nuevo agente**, sin Sitios.
-5. Crear un agente e ingresar con él. Puede crear otros agentes, pero no Masters.
+4. Salir e ingresar como ese Master. Aparece el inicio con Nuevo jugador y Nuevo agente, sin Sitios.
+5. Crear un agente e ingresar con él. Puede crear jugadores y otros agentes, pero no Masters.
 6. Volver al Super Master, seleccionar otro sitio y comprobar que cambian usuarios, banners, configuración y actividad.
 
 La selección es explícita en cada URL de la API; no existe un sitio seleccionado global para todo el servidor. Cambiar el sitio en una sesión no cambia la selección de otra persona.
@@ -80,3 +80,11 @@ Diseño prioritario para celular, contrastado con la referencia a 393 px de anch
 El ingreso móvil recupera la composición gris original, sin subtítulo añadido, con iconos de usuario y candado, etiquetas flotantes y encabezado azul. Medido contra la referencia a 393 × 660: tarjeta 363 × 319,27 px, encabezado 323 × 89,60 px y botón 147,66 × 54,56 px. El layout se centra en el alto visible, sin dibujar barras del navegador.
 
 `management/permissions.js` define la misma distribución para la API y la interfaz. Super Master tiene todas las secciones del Master y añade solamente Nuevo sitio y Sitios. Los agentes y subagentes reciben las seis secciones reducidas indicadas arriba. Se conserva la restricción de creación: Super Master → Masters; Master y agentes → agentes.
+
+## Inicio móvil y creación de jugadores
+
+Al ingresar, Masters, agentes y subagentes abren Estadísticas: Carga rápida, Netwin Mensual, Netwin Diario y Top Agentes del mes. Los gráficos son una vista de demostración con todos los puntos en cero, sin fuente de juego conectada. Los botones de fichas informan que los movimientos no están conectados; no modifican saldos. El Super Master elige un sitio si no tiene uno seleccionado y después ve ese mismo inicio, con Nuevo Master como única opción de creación. Solo él ve el rótulo Sitio seleccionado.
+
+Usuarios → Nuevo usuario ofrece Jugador y Agente. Cada rol conserva su borrador al cambiar de pestaña. Ingreso contiene las credenciales; Datos personales guarda nombre, documento, email y teléfono opcionales; Permisos muestra Deportes/Casino sin proveedores inventados; Agente incorpora Comisiones con preferencia Mensual/Semanal, sin ejecutar liquidaciones. Las contraseñas nuevas requieren 12 caracteres. Las cuentas de jugador se identifican en rojo y agentes en azul.
+
+La API permite Master/agente → agente o jugador; Super Master → Master exclusivamente. Los jugadores creados pueden autenticar sus credenciales y ver únicamente su cuenta, sin menús ni APIs administrativas. Esto no integra todavía el catálogo de juegos ni las sesiones de la antigua plataforma de jugadores. Las identidades de jugadores del archivo antiguo siguen sin importarse automáticamente.
