@@ -88,3 +88,7 @@ dialog form{max-height:none;overflow:visible}dialog header{transform:none;margin
 .user-form-tabs:has([data-create-tab=commissions]) button{font-size:12px;padding:8px 3px}.tabbed-create #dialog-fields{padding:0 17.6px 24px}.tabbed-create .credential-fields{min-height:128px;margin-bottom:8px}.tabbed-create .credential-label{margin:16px 0 0}.tabbed-create .personal-fields{width:85%;min-height:260px}.provider-permissions,.commission-fields{padding:0 10px}.provider-permissions h3,.commission-fields h3{font-size:16px;font-weight:400;margin:20px 0 10px}.provider-permissions p,.commission-fields p{color:#888}.provider-permissions{min-height:180px}.user-filters button{padding-left:13px;padding-right:13px}
 @media(max-width:359px){.quick-buttons button{padding:8px 14px;margin:6px 2px}.quick-search{padding-left:12px;padding-right:12px;gap:12px}.user-form-tabs button{font-size:12.8px}.user-form-tabs:has([data-create-tab=commissions]) button{font-size:10.5px}}
 .dashboard{padding-top:36px}.dashboard-card{margin-bottom:39px}.quick-card{min-height:195.09375px;margin-bottom:36.453125px}.zero-chart{height:195px}.top-agents{min-height:235px}.tabbed-create .credential-label{height:41.8px}.tabbed-create .credential-fields{min-height:115.6px}.tabbed-create #dialog-fields{padding-bottom:18px}.tabbed-create .personal-fields{min-height:230px}
+.remote-links{display:flex;gap:12px;flex-wrap:wrap;margin:0 0 20px}
+.remote-links a{color:#fff;text-decoration:underline;text-underline-offset:3px}
+#violet-connect{display:grid;gap:16px;max-width:480px}
+#violet-error{color:#bc193d}

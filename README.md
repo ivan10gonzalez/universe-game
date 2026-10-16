@@ -88,3 +88,11 @@ Al ingresar, Masters, agentes y subagentes abren Estadísticas: Carga rápida, N
 Usuarios → Nuevo usuario ofrece Jugador y Agente. Cada rol conserva su borrador al cambiar de pestaña. Ingreso contiene las credenciales; Datos personales guarda nombre, documento, email y teléfono opcionales; Permisos muestra Deportes/Casino sin proveedores inventados; Agente incorpora Comisiones con preferencia Mensual/Semanal, sin ejecutar liquidaciones. Las contraseñas nuevas requieren 12 caracteres. Las cuentas de jugador se identifican en rojo y agentes en azul.
 
 La API permite Master/agente → agente o jugador; Super Master → Master exclusivamente. Los jugadores creados pueden autenticar sus credenciales y ver únicamente su cuenta, sin menús ni APIs administrativas. Esto no integra todavía el catálogo de juegos ni las sesiones de la antigua plataforma de jugadores. Las identidades de jugadores del archivo antiguo siguen sin importarse automáticamente.
+
+## Plataforma Violeta conectada
+
+Solo Super Master ve **Panel Violeta** en Sitios, junto a los sitios blancos existentes. Al seleccionarlo, ingresá una vez las credenciales Master de Violeta: el servidor abre una sesión de ocho horas con ese sitio, mantiene únicamente la cookie en memoria asociada a la sesión Super Master y no guarda la contraseña. Si cualquiera de los servidores reinicia, puede ser necesario reconectar.
+
+El selector cambia el contexto de Usuarios, Banners y logo y Settings. Usuarios consulta las cuentas remotas; Banners y logo modifica las imágenes reales de Violeta; Settings muestra el editor de logo. Otras funciones del prototipo Violeta continúan como «Próximamente». No crea cuentas remotas ni mezcla datos con Universe. Masters y agentes blancos no pueden listar, conectar ni administrar el sitio remoto. La creación de sitios permanece como muestra.
+
+`VIOLET_ORIGIN` configura el destino desde el servidor; valor predeterminado `https://panel-violeta.onrender.com`. No se aceptan destinos aportados por el navegador ni se siguen redirecciones. No copiar claves en URLs o en el frontend. El almacenamiento de imágenes pertenece a Violeta y requiere disco persistente para sobrevivir a los redespliegues gratuitos; el editor incluye exportación/restauración.

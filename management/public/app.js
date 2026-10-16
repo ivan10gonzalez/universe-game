@@ -1,3 +1,4 @@
+import {mountBrandingEditor} from '/branding-editor.js';
 import { sectionsFor, canOpenSection } from '/management-permissions.js';
 (() => {
   'use strict';
@@ -11,7 +12,7 @@ import { sectionsFor, canOpenSection } from '/management-permissions.js';
     const body = await response.json();
     if (!response.ok) {
       if (response.status === 401 && !url.endsWith('/login')) showLogin();
-      throw new Error(body.error || 'No se pudo completar la operación.');
+      throw Object.assign(new Error(body.error || 'No se pudo completar la operación.'),{status:response.status});
     }
     return body;
   }
@@ -152,6 +153,26 @@ import { sectionsFor, canOpenSection } from '/management-permissions.js';
     $('#quick-agent')?.addEventListener('click',()=>openUser('agent'));
     document.querySelectorAll('[data-quick]').forEach(button=>button.addEventListener('click',()=>openDialog(button.dataset.quick, `<p>${$('#quick-username').value.trim() ? 'Usuario: '+e($('#quick-username').value.trim()) : 'Seleccioná una cuenta desde Usuarios.'}</p><p>Los movimientos de fichas todavía no están conectados en este panel.</p>`,null)));
   }
+  async function openRemote(next,scoped,active) {
+    const site=currentSite(); let panel;
+    try {panel=await api(route(scoped,'panel'));}
+    catch(error){
+      if(!active())return;
+      if(error.status!==428)throw error;
+      $('#content').innerHTML=heading('Conectar Panel Violeta','Ingresá con el Master de Violeta. La contraseña se envía a ese panel y no se guarda.')+`<section class="card"><form id="violet-connect"><label>Usuario Master<input name="username" required autocomplete="username" autocapitalize="none" value="master_violeta"></label><label>Contraseña<input name="password" required type="password" autocomplete="current-password"></label><p>La conexión dura esta sesión. Los cambios de imágenes se guardan en el sitio Violeta.</p><p role="alert" id="violet-error"></p><button>Conectar sitio</button></form></section>`;
+      $('#violet-connect').onsubmit=async event=>{event.preventDefault();const form=event.currentTarget,button=form.querySelector('button');button.disabled=true;$('#violet-error').textContent='Conectando…';try{await api(route(scoped,'connect'),'POST',{username:form.elements.username.value,password:form.elements.password.value});form.elements.password.value='';if(active())await openView(next);}catch(err){if(active())$('#violet-error').textContent=err.message;}finally{button.disabled=false;}};return;
+    }
+    if(!active())return;
+    const links=`<p class="remote-links"><a href="${e(site.url)}" target="_blank" rel="noopener">Ver plataforma Violeta ↗</a> · <a href="${e(site.url)}/admin" target="_blank" rel="noopener">Abrir panel Violeta ↗</a></p>`;
+    if(['banners','settings'].includes(next)){
+      $('#content').innerHTML=heading(next==='banners'?'Banners y logo · Violeta':'Logo · Violeta','Estos cambios se aplican únicamente a la plataforma Violeta.')+links+'<section id="remote-branding"></section>';
+      await mountBrandingEditor($('#remote-branding'),{endpoint:route(scoped,'branding'),header:'X-Management-Request',mode:next==='settings'?'logo':'all'});return;
+    }
+    if(next==='users'){
+      $('#content').innerHTML=heading('Usuarios · Violeta','Cuentas actuales de la plataforma conectada.')+links+`<section class="card"><div class="table-wrap"><table class="users"><thead><tr><th>Usuario</th><th>Tipo</th></tr></thead><tbody>${[panel.user,...panel.users].map(u=>`<tr><td>${e(u.username)}</td><td>${e(roles[u.role])}</td></tr>`).join('')}</tbody></table></div><p>La creación de cuentas en el prototipo Violeta todavía no está habilitada.</p></section>`;return;
+    }
+    $('#content').innerHTML=heading(`${next==='statistics'?'Inicio':sectionsFor(me.role).find(s=>s.id===next)?.label||'Sitio'} · Violeta`)+links+`<section class="card"><h2>${next==='statistics'?'Sitio conectado':'Próximamente'}</h2><p>${next==='statistics'?'Podés consultar Usuarios y modificar Banners y logo desde el menú. Las imágenes son las mismas que administra el Master violeta.':'Esta sección todavía no tiene datos en la plataforma Violeta.'}</p></section>`;
+  }
   async function openView(next) {
     if (!me) return;
     if (!canOpenSection(me.role, next)) { notify('No tenés acceso a esta sección.'); return; }
@@ -162,11 +183,12 @@ import { sectionsFor, canOpenSection } from '/management-permissions.js';
       if (next === 'sites') {
         if (me.role !== 'super') throw new Error('Acceso exclusivo del Super Master.');
         const data = await api('/api/management/me'); if (!active()) return; sites = data.sites;
-        $('#content').innerHTML = heading('Sitios', 'Elegí el sitio sobre el que querés trabajar.', '<button id="create-site" class="red">+ NUEVO SITIO</button>') + (sites.length ? `<div class="site-grid">${sites.map(s => `<article class="card site-card ${s.id === siteId ? 'selected' : ''}"><h2>${e(s.name)}</h2><p class="muted">Interfaz Base · Gestión de cuentas y contenidos</p><button data-select-site="${e(s.id)}">${s.id === siteId ? 'SITIO SELECCIONADO' : 'ADMINISTRAR SITIO'}</button><code>${e(s.id)}</code></article>`).join('')}</div>` : '<section class="card empty">Todavía no hay sitios.<br>La creación de nuevas plataformas estará disponible próximamente.</section>');
+        $('#content').innerHTML = heading('Sitios', 'Elegí el sitio sobre el que querés trabajar.', '<button id="create-site" class="red">+ NUEVO SITIO</button>') + (sites.length ? `<div class="site-grid">${sites.map(s => `<article class="card site-card ${s.id === siteId ? 'selected' : ''}"><h2>${e(s.name)}</h2><p class="muted">${s.external?'Interfaz Violeta · Plataforma conectada':'Panel blanco · Gestión de cuentas y contenidos'}</p><button data-select-site="${e(s.id)}">${s.id === siteId ? 'SITIO SELECCIONADO' : 'ADMINISTRAR SITIO'}</button><code>${e(s.id)}</code></article>`).join('')}</div>` : '<section class="card empty">Todavía no hay sitios.<br>La creación de nuevas plataformas estará disponible próximamente.</section>');
         $('#create-site').addEventListener('click', newSitePreview);
         $('#content').querySelectorAll('[data-select-site]').forEach(button => button.addEventListener('click', () => selectSite(button.dataset.selectSite)));
         return;
       }
+      if (currentSite()?.external) { await openRemote(next,scoped,active); return; }
       if (!scoped) { $('#content').innerHTML = heading('Seleccioná un sitio') + '<section class="card empty">Abrí <strong>Sitios</strong>, al final del menú, y elegí cuál querés administrar.</section>'; return; }
       const siteName = currentSite()?.name || '';
       if (next === 'users') {

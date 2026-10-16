@@ -1,3 +1,4 @@
+import { createVioletBridge } from './violet-bridge.js';
 import fs from 'node:fs';
 import { sectionsFor, canOpenSection } from './permissions.js';
 import path from 'node:path';
@@ -38,10 +39,10 @@ function image(value) {
   if (!valid) fail(400, 'El archivo no corresponde al formato de imagen.');
   return `data:image/${match[1]};base64,${bytes.toString('base64')}`;
 }
-async function readBody(req) {
+async function readBody(req, limit = 1500000) {
   if (!(req.headers['content-type'] || '').startsWith('application/json')) fail(415, 'Se requiere JSON.');
   let size = 0; const chunks = [];
-  for await (const chunk of req) { const buffer = Buffer.from(chunk); size += buffer.length; if (size > 1500000) fail(413, 'La solicitud es demasiado grande.'); chunks.push(buffer); }
+  for await (const chunk of req) { const buffer = Buffer.from(chunk); size += buffer.length; if (size > limit) fail(413, 'La solicitud es demasiado grande.'); chunks.push(buffer); }
   try { const body = JSON.parse(Buffer.concat(chunks).toString('utf8')); if (!body || typeof body !== 'object' || Array.isArray(body)) throw new Error(); return body; }
   catch { fail(400, 'JSON inválido.'); }
 }
@@ -64,7 +65,8 @@ function validateStore(db) {
     if (['agent', 'player'].includes(user.role) && current.role !== 'master') throw new Error('Agente sin Master.');
   }
 }
-export function createManagementApp({ dataDir, bootstrapPassword, secureCookies = false }) {
+export function createManagementApp({ dataDir, bootstrapPassword, secureCookies = false, violetOrigin = process.env.VIOLET_ORIGIN || 'https://panel-violeta.onrender.com' }) {
+  const violet = createVioletBridge({origin:violetOrigin});
   fs.mkdirSync(dataDir, { recursive: true, mode: 0o700 });
   const databasePath = path.join(dataDir, 'management.json');
   let db;
@@ -109,7 +111,7 @@ export function createManagementApp({ dataDir, bootstrapPassword, secureCookies 
     const key = token && tokenHash(token), stored = key && sessions.get(key);
     if (!stored || stored.expires < Date.now()) { if (key) sessions.delete(key); return null; }
     const user = db.users.find(u => u.id === stored.userId);
-    return user ? { key, user } : null;
+    return user ? { key, user, stored } : null;
   }
   function revoke(userId) { for (const [key, value] of sessions) if (value.userId === userId) sessions.delete(key); }
   function descendant(target, actor) {
@@ -140,10 +142,14 @@ export function createManagementApp({ dataDir, bootstrapPassword, secureCookies 
   function json(res, status, data) { res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(data)); }
   return async function handle(req, res) {
     res.setHeader('X-Content-Type-Options', 'nosniff'); res.setHeader('X-Frame-Options', 'DENY'); res.setHeader('Referrer-Policy', 'same-origin');
-    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
+    res.setHeader('Content-Security-Policy', `default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: ${violet.site.url}; connect-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'`);
     try {
       const url = new URL(req.url, 'http://localhost'), route = decodeURIComponent(url.pathname), method = req.method;
       if (method === 'GET' && route === '/api/health') return json(res, 200, { ok: true, service: 'site-management', version: 1 });
+      if (['GET', 'HEAD'].includes(method) && ['/branding-editor.js','/branding-editor.css'].includes(route)) {
+        res.writeHead(200, {'Content-Type':route.endsWith('.js')?'text/javascript; charset=utf-8':'text/css; charset=utf-8','Cache-Control':'no-store'});
+        return res.end(method==='HEAD'?undefined:fs.readFileSync(path.join(publicDir,route.slice(1))));
+      }
       if (['GET', 'HEAD'].includes(method) && route === '/management-permissions.js') {
         res.writeHead(200, { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'no-store' });
         return res.end(method === 'HEAD' ? undefined : fs.readFileSync(path.join(publicDir, '../permissions.js')));
@@ -181,7 +187,13 @@ export function createManagementApp({ dataDir, bootstrapPassword, secureCookies 
         res.setHeader('Set-Cookie', cookie(req, token)); return json(res, 200, { user: safeUser(user) });
       }
       const auth = session(req); if (!auth) fail(401, 'Ingresá para continuar.'); const actor = auth.user;
-      if (route === '/api/management/me' && method === 'GET') return json(res, 200, { user: safeUser(actor), sections: sectionsFor(actor.role), sites: db.sites.filter(s => actor.role === 'super' || s.id === actor.siteId) });
+      if (route === '/api/management/me' && method === 'GET') return json(res, 200, { user: safeUser(actor), sections: sectionsFor(actor.role), sites: [...db.sites.filter(s => actor.role === 'super' || s.id === actor.siteId), ...(actor.role==='super'?[violet.site]:[])] });
+      const remote = /^\/api\/management\/sites\/connected-panel-violeta\/(connect|branding|panel)$/.exec(route);
+      if(remote){
+        if(actor.role!=='super')fail(403,'Solo el Super Master puede administrar otros sitios.');
+        if(remote[1]==='connect'&&method==='POST')return json(res,200,await violet.connect(auth.stored,await readBody(req)));
+        return json(res,200,await violet.request(auth.stored,remote[1],method,method==='POST'?await readBody(req,7200000):undefined));
+      }
       if (route === '/api/management/logins' && method === 'GET') return json(res, 200, { entries: db.audit.filter(e => e.actorId === actor.id && e.action === 'Ingreso a la cuenta').slice(-50).reverse().map(e => e.at) });
       if (route === '/api/management/logout' && method === 'POST') { sessions.delete(auth.key); res.setHeader('Set-Cookie', cookie(req, '', 0)); return json(res, 200, { ok: true }); }
       if (route === '/api/management/password' && method === 'POST') {
